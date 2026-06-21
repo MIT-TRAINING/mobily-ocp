@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Container Lifecycle — Interactive | Module 1</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .states { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin:8px 0 4px; }
+  .state {
+    min-width:120px; text-align:center; padding:16px 18px; border-radius:14px;
+    border:2px solid var(--line); background:var(--surface); font-weight:750; color:var(--muted);
+    transition: all .25s ease; position:relative;
+  }
+  .state small { display:block; font-weight:500; font-size:12px; margin-top:4px; }
+  .state.active { transform:scale(1.06); box-shadow:var(--shadow-lg); }
+  .state.s-created.active { border-color:var(--blue);  background:var(--blue-bg);  color:var(--blue-ink); }
+  .state.s-running.active { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); }
+  .state.s-paused.active  { border-color:var(--amber); background:var(--amber-bg); color:var(--amber-ink); }
+  .state.s-stopped.active { border-color:var(--slate); background:var(--slate-bg); color:var(--ink); }
+  .state.s-removed.active { border-color:var(--red);   background:var(--red-bg);   color:var(--red-ink); }
+  .log { font-family:var(--mono); font-size:13px; background:#0f172a; color:#e2e8f0; border-radius:10px; padding:14px; max-height:220px; overflow:auto; }
+  .log div { padding:2px 0; border-bottom:1px solid rgba(255,255,255,.06); }
+  .log .prompt { color:#7dd3fc; }
+  .log .ok { color:#86efac; }
+  .log .warn { color:#fca5a5; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 1</a>
+  <span class="pill">Visualization 4 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · The container lifecycle</div>
+    <h1>Drive a container through its life</h1>
+    <p class="lede">A container moves through a small set of states. Only certain actions are valid from each state — the runtime enforces that. Issue commands and watch it transition (invalid actions are disabled).</p>
+  </div>
+
+  <div class="card">
+    <h2>Lifecycle state machine</h2>
+    <div class="states">
+      <div class="state s-created" data-s="created">Created<small>exists, not started</small></div>
+      <div class="state s-running" data-s="running">Running<small>process executing</small></div>
+      <div class="state s-paused"  data-s="paused">Paused<small>frozen in memory</small></div>
+      <div class="state s-stopped" data-s="stopped">Stopped<small>process exited</small></div>
+      <div class="state s-removed" data-s="removed">Removed<small>writable layer gone</small></div>
+    </div>
+
+    <div class="controls" id="actions" style="justify-content:center;margin-top:18px"></div>
+
+    <div class="grid two" style="margin-top:8px">
+      <div>
+        <h3>Command log</h3>
+        <div class="log" id="log"></div>
+      </div>
+      <div>
+        <h3>What's happening</h3>
+        <div class="note" id="explain" style="font-size:15px"></div>
+        <button class="btn ghost" id="restart" style="margin-top:10px">↺ Start over</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>The transitions</h2>
+    <div class="grid three">
+      <div class="layer l-blue" style="flex-direction:column;align-items:flex-start"><code>create</code><small>image → Created</small></div>
+      <div class="layer l-green" style="flex-direction:column;align-items:flex-start"><code>start / restart</code><small>→ Running</small></div>
+      <div class="layer l-amber" style="flex-direction:column;align-items:flex-start"><code>pause / unpause</code><small>Running ⇄ Paused</small></div>
+      <div class="layer l-slate" style="flex-direction:column;align-items:flex-start"><code>stop / kill</code><small>Running → Stopped</small></div>
+      <div class="layer l-red" style="flex-direction:column;align-items:flex-start"><code>rm</code><small>Created/Stopped → Removed</small></div>
+      <div class="layer l-green" style="flex-direction:column;align-items:flex-start"><code>start</code><small>Stopped → Running again</small></div>
+    </div>
+    <div class="note warn">A <strong>Stopped</strong> container still keeps its writable layer (you can restart it). Only <code>rm</code> destroys it for good.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="03-image-layers.html">← Image layers</a>
+    <a class="btn primary" href="05-build-ship-run.html">Next: Build → Ship → Run →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// transitions: action -> {from:[...], to, cmd, desc}
+const T = {
+  create:  { from:["none"],                to:"created", cmd:"podman create myapp", desc:"A writable layer and config are prepared from the image, but the main process has not started yet." },
+  start:   { from:["created","stopped"],   to:"running", cmd:"podman start myapp",  desc:"The main process launches. The container is now doing work." },
+  pause:   { from:["running"],             to:"paused",  cmd:"podman pause myapp",   desc:"All processes are frozen via the cgroup freezer. State stays in memory — nothing is lost, nothing runs." },
+  unpause: { from:["paused"],              to:"running", cmd:"podman unpause myapp", desc:"Frozen processes resume exactly where they left off." },
+  stop:    { from:["running"],             to:"stopped", cmd:"podman stop myapp",    desc:"A graceful shutdown signal (SIGTERM) is sent. The process exits, but the writable layer is kept." },
+  kill:    { from:["running"],             to:"stopped", cmd:"podman kill myapp",    desc:"An immediate SIGKILL — the process dies right away with no chance to clean up." },
+  restart: { from:["stopped"],             to:"running", cmd:"podman restart myapp", desc:"The same container (with its existing writable layer) starts again." },
+  rm:      { from:["created","stopped"],   to:"removed", cmd:"podman rm myapp",      desc:"The container and its writable layer are deleted. Any runtime data is gone for good." },
+};
+let cur = "none";
+
+function log(cmd, line, cls){
+  const l=document.getElementById("log");
+  const d=document.createElement("div");
+  d.innerHTML = `<span class="prompt">$</span> ${cmd}` + (line?`\n<span class="${cls||''}">  ${line}</span>`:"");
+  d.style.whiteSpace="pre-wrap";
+  l.appendChild(d); l.scrollTop=l.scrollHeight;
+}
+function render(){
+  document.querySelectorAll(".state").forEach(s=>s.classList.toggle("active", s.dataset.s===cur));
+  const wrap=document.getElementById("actions"); wrap.innerHTML="";
+  Object.entries(T).forEach(([act,t])=>{
+    const b=document.createElement("button");
+    b.className="btn"; b.textContent=act;
+    const ok = t.from.includes(cur);
+    b.disabled=!ok;
+    if(act==="rm") b.classList.add("red");
+    else if(t.to==="running") b.classList.add("green");
+    else if(t.to==="paused") b.classList.add("amber");
+    else if(ok) b.classList.add("primary");
+    b.onclick=()=>doAction(act);
+    wrap.appendChild(b);
+  });
+  if(cur==="removed"){
+    const note=document.createElement("span");
+    note.className="sub"; note.style.margin="0";
+    note.textContent="Container removed. Start over to create a new one.";
+    wrap.appendChild(note);
+  }
+}
+function doAction(act){
+  const t=T[act];
+  log(t.cmd, t.to.toUpperCase(), t.to==="removed"?"warn":"ok");
+  cur=t.to;
+  document.getElementById("explain").innerHTML = `<strong>${act}</strong> → <strong>${t.to}</strong>. ${t.desc}`;
+  render();
+}
+document.getElementById("restart").onclick=()=>{
+  cur="none"; document.getElementById("log").innerHTML="";
+  document.getElementById("explain").innerHTML="Click <strong>create</strong> to begin.";
+  render();
+};
+document.getElementById("explain").innerHTML="Click <strong>create</strong> to begin.";
+render();
+
+renderQuiz("quiz", [
+  { q: "From the 'Created' state, which actions are valid?",
+    options: ["pause or kill","start or rm","restart or unpause","stop only"],
+    answer: 1,
+    explain: "A Created container hasn't run yet — you can start it (→ Running) or rm it (→ Removed). Pause/stop/kill only apply to a running container." },
+  { q: "What is the difference between a Stopped container and a Removed one?",
+    options: [
+      "Nothing — they're the same","Stopped keeps its writable layer (restartable); Removed deletes it permanently",
+      "Removed can be restarted but Stopped cannot","Stopped uses more CPU"],
+    answer: 1,
+    explain: "Stopped = exited but its filesystem/writable layer remains, so you can start it again. rm destroys the writable layer for good." },
+  { q: "What does 'pause' do to a running container?",
+    options: ["Deletes it","Freezes its processes in memory via the cgroup freezer (resumable with unpause)",
+      "Restarts it","Saves it to a registry"],
+    answer: 1,
+    explain: "Pause freezes the processes — they stop running but state stays in memory. Unpause resumes exactly where they left off." },
+  { q: "Why are containers described as 'ephemeral'?",
+    options: ["They expire after 24 hours","They can only run once",
+      "They're designed to be disposable — removing one destroys its writable layer and any runtime data","They cannot be stopped"],
+    answer: 2,
+    explain: "Containers are meant to be replaceable. Their writable layer dies with them, so durable data must live in Volumes/Persistent Volumes, not the container." }
+]);
+</script>
+</body>
+</html>

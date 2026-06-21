@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anatomy of a Container — Interactive | Module 1</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 1</a>
+  <span class="pill">Visualization 2 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Container architecture & Linux primitives</div>
+    <h1>Build a container from a plain process</h1>
+    <p class="lede">A container is just a Linux <strong>process</strong> with two things added: <strong>namespaces</strong> (what it can <em>see</em>) and <strong>cgroups</strong> (what it can <em>use</em>). Toggle them on and watch an ordinary process turn into a container.</p>
+  </div>
+
+  <!-- ===== Namespaces ===== -->
+  <div class="card">
+    <h2>① Namespaces — isolation (what the process can <em>see</em>)</h2>
+    <p class="sub">Turn each namespace on to give the process its own private view of that resource. With none on, it sees the whole host.</p>
+
+    <div class="controls" id="nsToggles"></div>
+    <div class="controls">
+      <button class="btn ghost" id="nsAll">Enable all</button>
+      <button class="btn ghost" id="nsNone">Disable all</button>
+    </div>
+
+    <div class="grid two">
+      <div>
+        <h3>The process sees…</h3>
+        <div class="stack" id="visPanel"></div>
+      </div>
+      <div>
+        <h3>Status</h3>
+        <div class="note" id="nsStatus" style="font-size:15px"></div>
+        <p class="sub">A process becomes a true <strong>container</strong> once it has its own filesystem (MNT), process tree (PID), and network (NET) views — the rest harden it further.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== cgroups ===== -->
+  <div class="card">
+    <h2>② cgroups — resource limits (what the process can <em>use</em>)</h2>
+    <p class="sub">Namespaces hide things; cgroups <strong>cap</strong> things. Set a memory limit, then push the workload's demand past it.</p>
+
+    <div class="slider-row">
+      <label>Memory limit</label>
+      <input type="range" id="memLimit" min="64" max="2048" step="64" value="512">
+      <span class="val" id="memLimitVal">512 MB</span>
+    </div>
+    <div class="slider-row">
+      <label>CPU limit</label>
+      <input type="range" id="cpuLimit" min="1" max="40" step="1" value="10">
+      <span class="val" id="cpuLimitVal">1.0 cores</span>
+    </div>
+    <div class="slider-row">
+      <label>Workload demand</label>
+      <input type="range" id="memDemand" min="64" max="2048" step="64" value="256">
+      <span class="val" id="memDemandVal">256 MB</span>
+    </div>
+
+    <div class="metric" style="margin-top:14px">
+      <div class="lab"><span>Memory consumption vs limit</span><span id="memPctTxt">50%</span></div>
+      <div class="bar"><span id="memBar" class="fill-green" style="width:50%"></span></div>
+    </div>
+    <div class="note ok" id="cgStatus">Within limits — the process runs normally.</div>
+    <p class="sub">This is exactly how Kubernetes/OpenShift <strong>requests &amp; limits</strong> work: exceed the memory limit and the kernel <code>OOMKill</code>s the container.</p>
+  </div>
+
+  <!-- ===== Recap ===== -->
+  <div class="card">
+    <h2>Putting it together</h2>
+    <div class="grid three">
+      <div class="layer l-blue" style="flex-direction:column;align-items:flex-start;gap:4px">Namespaces<small>Isolation — own view of PID, NET, MNT, UTS, IPC, USER</small></div>
+      <div class="layer l-green" style="flex-direction:column;align-items:flex-start;gap:4px">cgroups<small>Limits — cap CPU, memory, I/O</small></div>
+      <div class="layer l-amber" style="flex-direction:column;align-items:flex-start;gap:4px">Capabilities / seccomp / SELinux<small>Confinement — what it may do</small></div>
+    </div>
+    <div class="note">All three are <strong>kernel features</strong>. There is no separate "container engine magic" — the runtime (CRI-O, containerd) just asks the kernel to apply them to a process.</div>
+  </div>
+
+  <!-- ===== Self check ===== -->
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="01-vm-vs-containers.html">← VM vs Containers</a>
+    <a class="btn primary" href="03-image-layers.html">Next: Image layers →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const NS = [
+  { id:"pid",  name:"PID",  hostView:"All host processes (thousands)", isoView:"Only its own processes — it is PID 1" },
+  { id:"net",  name:"NET",  hostView:"Host's eth0, every port, all sockets", isoView:"Its own private network interface & ports" },
+  { id:"mnt",  name:"MNT",  hostView:"The host's entire filesystem", isoView:"Only its own image filesystem (rootfs)" },
+  { id:"uts",  name:"UTS",  hostView:"The host's hostname", isoView:"Its own hostname" },
+  { id:"ipc",  name:"IPC",  hostView:"Host shared memory & message queues", isoView:"Its own isolated IPC" },
+  { id:"user", name:"USER", hostView:"root = real host root (dangerous)", isoView:"root inside maps to an unprivileged host user" },
+];
+const on = {}; NS.forEach(n=>on[n.id]=false);
+
+const togWrap = document.getElementById("nsToggles");
+NS.forEach(n=>{
+  const lab = document.createElement("label");
+  lab.className="toggle"; lab.id="t-"+n.id;
+  lab.innerHTML = `<input type="checkbox"> ${n.name}`;
+  lab.querySelector("input").addEventListener("change", e=>{ on[n.id]=e.target.checked; renderNS(); });
+  togWrap.appendChild(lab);
+});
+function renderNS(){
+  // visibility panel
+  const vp = document.getElementById("visPanel"); vp.innerHTML="";
+  NS.forEach(n=>{
+    const isolated = on[n.id];
+    const el=document.createElement("div");
+    el.className="layer fade-in " + (isolated?"l-green":"l-red");
+    el.innerHTML = `${n.name} <small>${isolated? "🔒 "+n.isoView : "👁️ "+n.hostView}</small>`;
+    vp.appendChild(el);
+  });
+  // toggle styling
+  NS.forEach(n=>document.getElementById("t-"+n.id).classList.toggle("on", on[n.id]));
+  // status
+  const count = NS.filter(n=>on[n.id]).length;
+  const core = on.mnt && on.pid && on.net;
+  const s=document.getElementById("nsStatus");
+  if (count===0){ s.className="note warn"; s.innerHTML="🧱 <strong>Just a normal process.</strong> It can see and touch the entire host — no isolation at all."; }
+  else if (!core){ s.className="note"; s.innerHTML=`🔧 <strong>Partially isolated</strong> (${count}/6). Still missing one of the core views (filesystem, processes, or network) — not yet a real container.`; }
+  else if (count<6){ s.className="note ok"; s.innerHTML=`📦 <strong>This is a container!</strong> It has its own filesystem, process tree, and network. Enable the rest (USER especially) to harden it.`; }
+  else { s.className="note ok"; s.innerHTML="🛡️ <strong>Fully isolated container.</strong> Including USER namespace → this is how <em>rootless</em> Podman containers stay safe."; }
+}
+document.getElementById("nsAll").onclick=()=>{NS.forEach(n=>on[n.id]=true);syncBoxes();renderNS();};
+document.getElementById("nsNone").onclick=()=>{NS.forEach(n=>on[n.id]=false);syncBoxes();renderNS();};
+function syncBoxes(){NS.forEach(n=>document.querySelector("#t-"+n.id+" input").checked=on[n.id]);}
+renderNS();
+
+// cgroups
+const memLimit=document.getElementById("memLimit"), cpuLimit=document.getElementById("cpuLimit"), memDemand=document.getElementById("memDemand");
+function renderCg(){
+  const lim=+memLimit.value, dem=+memDemand.value, cpu=(+cpuLimit.value/10);
+  document.getElementById("memLimitVal").textContent=lim+" MB";
+  document.getElementById("cpuLimitVal").textContent=cpu.toFixed(1)+" cores";
+  document.getElementById("memDemandVal").textContent=dem+" MB";
+  const pct=Math.min(150, dem/lim*100);
+  const bar=document.getElementById("memBar");
+  bar.style.width=Math.min(100,pct)+"%";
+  document.getElementById("memPctTxt").textContent=Math.round(pct)+"%";
+  const st=document.getElementById("cgStatus");
+  if (dem>lim){ bar.className="fill-red"; st.className="note warn"; st.innerHTML=`💥 <strong>OOMKilled!</strong> Demand (${dem} MB) exceeds the limit (${lim} MB). The kernel kills the container to protect the host.`; }
+  else if (pct>80){ bar.className="fill-amber"; st.className="note"; st.innerHTML=`⚠️ <strong>Near the limit</strong> (${Math.round(pct)}%). One spike away from an OOMKill.`; }
+  else { bar.className="fill-green"; st.className="note ok"; st.innerHTML="✅ Within limits — the process runs normally."; }
+}
+[memLimit,cpuLimit,memDemand].forEach(s=>s.addEventListener("input",renderCg));
+renderCg();
+
+renderQuiz("quiz", [
+  { q: "What do Linux namespaces give a containerized process?",
+    options: [
+      "More CPU cores","An isolated, private view of system resources (its own PID/NET/MNT/… view)",
+      "Automatic restarts","A faster network card"],
+    answer: 1,
+    explain: "Namespaces are about isolation — they limit WHAT a process can SEE: its own process tree, network stack, filesystem mounts, hostname, IPC, and user mapping." },
+  { q: "What is the job of cgroups (control groups)?",
+    options: [
+      "To encrypt container traffic","To build container images",
+      "To limit and meter what resources a process can USE (CPU, memory, I/O)","To assign IP addresses"],
+    answer: 2,
+    explain: "cgroups enforce resource limits. Set a memory limit and the kernel will OOMKill the process if it exceeds it — the foundation of Kubernetes requests & limits." },
+  { q: "A container's memory demand exceeds its cgroup memory limit. What happens?",
+    options: [
+      "The host crashes","The container is OOMKilled by the kernel",
+      "The limit is automatically raised","Nothing — limits are advisory"],
+    answer: 1,
+    explain: "Memory limits are hard. Exceeding them triggers an OOM (out-of-memory) kill of the offending container, protecting the host and other workloads." },
+  { q: "Where does the 'magic' of containers actually live?",
+    options: [
+      "In a special container CPU","In the Docker company's servers",
+      "In ordinary Linux kernel features (namespaces, cgroups, etc.) that the runtime applies to a process","In the image file format only"],
+    answer: 2,
+    explain: "There is no separate magic engine. The runtime (CRI-O, containerd) simply asks the kernel to wrap a normal process with namespaces, cgroups, and security primitives." }
+]);
+</script>
+</body>
+</html>

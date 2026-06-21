@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Layers & Copy-on-Write — Interactive | Module 1</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 1</a>
+  <span class="pill">Visualization 3 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Images, layers & copy-on-write</div>
+    <h1>One image, many containers — shared layers</h1>
+    <p class="lede">An image is a stack of <strong>read-only layers</strong>. Every container adds just a <strong>thin writable layer</strong> on top. Build an image, launch containers, write data — and see why that data vanishes when the container is removed.</p>
+  </div>
+
+  <!-- ===== Build the image ===== -->
+  <div class="card">
+    <h2>① Build the image, layer by layer</h2>
+    <p class="sub">Each <code>Containerfile</code> instruction adds one cached, read-only layer.</p>
+    <div class="controls">
+      <button class="btn primary" id="addLayer">+ Add next layer</button>
+      <button class="btn ghost" id="resetImg">Reset image</button>
+    </div>
+    <div class="grid two">
+      <div>
+        <h3>Image (read-only layers)</h3>
+        <div class="stack" id="imgStack"></div>
+        <div class="metric" style="margin-top:12px">
+          <div class="lab"><span>Image size on disk</span><span id="imgSize">0 MB</span></div>
+        </div>
+      </div>
+      <div>
+        <h3>Containerfile</h3>
+        <pre id="dockerfile" style="min-height:160px">FROM ubi9        # add layers →</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Run containers ===== -->
+  <div class="card">
+    <h2>② Run containers from that image</h2>
+    <p class="sub">Build the image first, then launch containers. Notice they all <strong>share the same read-only layers</strong> — only the writable layer is per-container.</p>
+    <div class="controls">
+      <button class="btn green" id="runC" disabled>▶ Run a container</button>
+      <span class="sub" id="runHint" style="margin:0">Add at least one image layer to enable this.</span>
+    </div>
+    <div class="grid three" id="containers"></div>
+
+    <div class="legend">
+      <span><i style="background:var(--slate-bg)"></i> Shared read-only image layers (stored once)</span>
+      <span><i style="background:var(--green-bg);border-color:var(--green)"></i> Per-container writable layer</span>
+      <span><i style="background:var(--red-bg);border-color:var(--red)"></i> Data written at runtime</span>
+    </div>
+  </div>
+
+  <!-- ===== Storage summary ===== -->
+  <div class="card">
+    <h2>③ Storage efficiency &amp; the ephemeral trap</h2>
+    <div class="grid two">
+      <div class="note ok" id="storeSummary" style="font-size:15px">Run some containers to see the math.</div>
+      <div class="note warn">⚠️ <strong>Remove a container and its writable layer is destroyed</strong> — every byte written at runtime is gone. This is why production data needs <strong>Volumes</strong> (and, at cluster scale, Persistent Volumes — Module 7).</div>
+    </div>
+  </div>
+
+  <!-- ===== Self check ===== -->
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="02-container-anatomy.html">← Container anatomy</a>
+    <a class="btn primary" href="04-container-lifecycle.html">Next: Lifecycle →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const LAYERS = [
+  { cmd:"FROM ubi9",                       label:"Base image (ubi9)", size:80 },
+  { cmd:"RUN dnf install -y nodejs",        label:"Install runtime",   size:120 },
+  { cmd:"COPY package.json .",              label:"Copy manifest",     size:2 },
+  { cmd:"RUN npm install",                  label:"Install deps",      size:60 },
+  { cmd:"COPY . .",                         label:"Copy app code",     size:8 },
+];
+let built = 0, containers = [], cid = 0;
+
+function renderImage(){
+  const st=document.getElementById("imgStack"); st.innerHTML="";
+  let total=0;
+  for(let i=built-1;i>=0;i--){ // top layer first
+    const l=LAYERS[i];
+    const el=document.createElement("div");
+    el.className="layer l-slate fade-in";
+    el.innerHTML=`${l.label} <small>${l.size} MB · read-only</small>`;
+    st.appendChild(el);
+  }
+  total=LAYERS.slice(0,built).reduce((a,l)=>a+l.size,0);
+  document.getElementById("imgSize").textContent=total+" MB";
+  document.getElementById("dockerfile").textContent =
+    built===0 ? "FROM ubi9        # add layers →"
+    : LAYERS.slice(0,built).map(l=>l.cmd).join("\n");
+  const runBtn=document.getElementById("runC");
+  runBtn.disabled = built===0;
+  document.getElementById("runHint").textContent = built===0
+    ? "Add at least one image layer to enable this." : "";
+  renderStore();
+}
+document.getElementById("addLayer").onclick=()=>{ if(built<LAYERS.length){built++;renderImage();} };
+document.getElementById("resetImg").onclick=()=>{ built=0; containers=[]; document.getElementById("containers").innerHTML=""; renderImage(); };
+
+function renderStore(){
+  const imgSize=LAYERS.slice(0,built).reduce((a,l)=>a+l.size,0);
+  const writable=containers.reduce((a,c)=>a+c.data,0);
+  const n=containers.length;
+  const naive=imgSize*n; // if layers were NOT shared
+  const actual=imgSize + writable; // shared once + writable deltas
+  const s=document.getElementById("storeSummary");
+  if(n===0){ s.innerHTML="Run some containers to see the math."; return; }
+  s.innerHTML=`Without layer sharing, ${n} containers would need <strong>${naive} MB</strong> (${imgSize} MB × ${n}). `+
+    `With shared read-only layers, actual disk use is just <strong>${actual} MB</strong> — the image stored <strong>once</strong> + ${writable} MB of writable deltas. `+
+    (naive>actual ? `That's a <strong>${(naive/actual).toFixed(1)}× saving</strong>.` : "");
+}
+
+function renderContainer(c){
+  const card=document.createElement("div");
+  card.className="card fade-in"; card.style.margin="0"; card.style.padding="14px";
+  card.id="cont-"+c.id;
+  card.innerHTML = `
+    <strong>Container ${c.id}</strong>
+    <div class="stack" style="margin:10px 0">
+      <div class="layer l-red" style="${c.data?'':'opacity:.35'}">Runtime data <small>${c.data} MB written</small></div>
+      <div class="layer l-green">Writable layer <small>thin, per-container</small></div>
+      <div class="layer l-slate" style="opacity:.7">↓ shares ${built} read-only image layer(s)</div>
+    </div>
+    <div class="controls" style="margin:0">
+      <button class="btn amber" data-act="write">✎ Write 30 MB</button>
+      <button class="btn red" data-act="rm">🗑 Remove</button>
+    </div>`;
+  card.querySelector('[data-act=write]').onclick=()=>{ c.data+=30; refresh(c); };
+  card.querySelector('[data-act=rm]').onclick=()=>{ removeContainer(c); };
+  return card;
+}
+function refresh(c){
+  const card=document.getElementById("cont-"+c.id);
+  const dataLayer=card.querySelector(".l-red");
+  dataLayer.style.opacity=c.data?1:.35;
+  dataLayer.querySelector("small").textContent=c.data+" MB written";
+  card.classList.add("flash"); setTimeout(()=>card.classList.remove("flash"),700);
+  renderStore();
+}
+function removeContainer(c){
+  const card=document.getElementById("cont-"+c.id);
+  if(c.data>0){
+    card.querySelector(".stack").innerHTML='<div class="layer l-red">💥 Writable layer destroyed — '+c.data+' MB of data LOST</div>';
+    card.querySelector(".controls").remove();
+    setTimeout(()=>{ card.remove(); containers=containers.filter(x=>x!==c); renderStore(); }, 1400);
+  } else {
+    card.remove(); containers=containers.filter(x=>x!==c); renderStore();
+  }
+}
+document.getElementById("runC").onclick=()=>{
+  const c={id:++cid, data:0}; containers.push(c);
+  document.getElementById("containers").appendChild(renderContainer(c));
+  renderStore();
+};
+renderImage();
+
+renderQuiz("quiz", [
+  { q: "How is a container image structured?",
+    options: ["As a single compressed binary","As a stack of cached, read-only layers",
+      "As a running process","As a database table"],
+    answer: 1,
+    explain: "Each build instruction adds one read-only layer. Layers are cached and reused, which speeds up builds and saves storage." },
+  { q: "Ten containers run from the same image. How are the image's read-only layers stored?",
+    options: ["Copied fully for each container (10×)","Stored once and shared by all ten containers",
+      "Not stored at all","Re-downloaded on every request"],
+    answer: 1,
+    explain: "Read-only layers are shared. Only each container's thin writable layer is unique — that's what makes containers cheap to start and store." },
+  { q: "What is 'copy-on-write' in this context?",
+    options: ["Images are copied to the cloud automatically",
+      "A file from a read-only layer is copied up into the writable layer only when modified",
+      "Containers write directly into the base image","A backup runs on every write"],
+    answer: 1,
+    explain: "Lower layers are never changed. The first time a container modifies such a file, it's copied into the writable layer and changed there." },
+  { q: "You write important data inside a running container, then remove the container. What happens to the data?",
+    options: ["It is automatically backed up","It moves into the image","It is lost — the writable layer is destroyed",
+      "It syncs to other containers"],
+    answer: 2,
+    explain: "The writable layer is tied to the container's life. Removing the container destroys it. Persisting data requires Volumes / Persistent Volumes." }
+]);
+</script>
+</body>
+</html>

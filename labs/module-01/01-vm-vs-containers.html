@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VM vs Containers — Interactive | Module 1</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 1</a>
+  <span class="pill">Visualization 1 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Virtual Machines vs Containers</div>
+    <h1>Same hardware. Two ways to pack it.</h1>
+    <p class="lede">A VM ships a <strong>full guest OS</strong> for every workload. A container <strong>shares the host kernel</strong> and ships only the app. Deploy workloads to each side and watch what fits.</p>
+  </div>
+
+  <!-- ===== Interactive packing ===== -->
+  <div class="card">
+    <h2>Pack the host</h2>
+    <p class="sub">Each side runs on an identical host with <strong>16 GB RAM</strong>. Click “Deploy a workload” and see how many you can fit before you run out.</p>
+
+    <div class="controls">
+      <button class="btn primary" id="deployBoth">+ Deploy a workload to both</button>
+      <button class="btn ghost" id="reset">Reset</button>
+    </div>
+
+    <div class="grid two">
+      <!-- VM side -->
+      <div>
+        <h3 style="color:var(--red-ink)">🖥️ Virtual Machine model</h3>
+        <div class="stack" id="vmStack" style="min-height:60px"></div>
+        <div class="metric" style="margin-top:14px">
+          <div class="lab"><span>RAM used</span><span id="vmRamTxt">0 / 16 GB</span></div>
+          <div class="bar"><span class="fill-red" id="vmRamBar" style="width:0%"></span></div>
+        </div>
+        <p class="sub" style="margin-top:10px">Each VM = <strong>~2.2 GB</strong> (2 GB guest OS + app) · boots in <strong>~40 s</strong> · image ~2 GB</p>
+      </div>
+
+      <!-- Container side -->
+      <div>
+        <h3 style="color:var(--green-ink)">📦 Container model</h3>
+        <div class="stack" id="ctStack" style="min-height:60px"></div>
+        <div class="metric" style="margin-top:14px">
+          <div class="lab"><span>RAM used</span><span id="ctRamTxt">0 / 16 GB</span></div>
+          <div class="bar"><span class="fill-green" id="ctRamBar" style="width:0%"></span></div>
+        </div>
+        <p class="sub" style="margin-top:10px">Each container = <strong>~0.25 GB</strong> (shared kernel + app) · starts in <strong>~0.4 s</strong> · image ~120 MB</p>
+      </div>
+    </div>
+
+    <div class="note ok" id="verdict">Deploy a few workloads to compare density.</div>
+  </div>
+
+  <!-- ===== Architecture stacks ===== -->
+  <div class="card">
+    <h2>Why the difference? Look at the stack</h2>
+    <p class="sub">Hover a layer to see its role. The <strong>kernel boundary</strong> is everything: VMs duplicate it, containers share it.</p>
+    <div class="grid two">
+      <div>
+        <div class="stack">
+          <div class="layer l-red" title="A whole operating system + kernel, per VM. This is the heavy part.">Guest OS + Kernel <small>App A</small></div>
+          <div class="layer l-red" title="Another full OS + kernel for the second workload.">Guest OS + Kernel <small>App B</small></div>
+          <div class="layer l-amber" title="Emulates hardware so each VM thinks it owns a machine.">Hypervisor</div>
+          <div class="layer l-slate" title="The host's own operating system.">Host OS</div>
+          <div class="layer l-slate" title="Physical CPU / RAM / disk.">Physical Hardware</div>
+        </div>
+        <p class="sub" style="text-align:center;margin-top:8px"><strong>VM:</strong> a kernel per workload</p>
+      </div>
+      <div>
+        <div class="stack">
+          <div class="layer l-blue" title="Only the app + its libraries. No OS, no kernel.">Bins/Libs <small>App A</small></div>
+          <div class="layer l-blue" title="Only the app + its libraries.">Bins/Libs <small>App B</small></div>
+          <div class="layer l-green" title="CRI-O / containerd / Docker — starts isolated processes.">Container Runtime</div>
+          <div class="layer l-slate" title="ONE shared kernel for every container.">Host OS + Shared Kernel</div>
+          <div class="layer l-slate" title="Physical CPU / RAM / disk.">Physical Hardware</div>
+        </div>
+        <p class="sub" style="text-align:center;margin-top:8px"><strong>Container:</strong> one shared kernel</p>
+      </div>
+    </div>
+    <div class="note">In real clusters these <strong>combine</strong>: OpenShift nodes are often VMs, and containers (pods) run inside them — VM isolation between nodes, container density within each node.</div>
+  </div>
+
+  <!-- ===== Self check ===== -->
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <p class="sub">Answer all four to test your understanding.</p>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="index.html">← Hub</a>
+    <a class="btn primary" href="02-container-anatomy.html">Next: What makes a container? →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const HOST = 16, VM_COST = 2.2, CT_COST = 0.25;
+let vm = 0, ct = 0;
+
+function add(stackId, klass, label){
+  const el = document.createElement("div");
+  el.className = "layer " + klass + " fade-in";
+  el.innerHTML = label;
+  document.getElementById(stackId).appendChild(el);
+}
+function render(){
+  const vmRam = (vm*VM_COST), ctRam = (ct*CT_COST);
+  document.getElementById("vmRamTxt").textContent = vmRam.toFixed(1) + " / 16 GB";
+  document.getElementById("ctRamTxt").textContent = ctRam.toFixed(2) + " / 16 GB";
+  document.getElementById("vmRamBar").style.width = Math.min(100, vmRam/HOST*100) + "%";
+  document.getElementById("ctRamBar").style.width = Math.min(100, ctRam/HOST*100) + "%";
+  const maxVm = Math.floor(HOST/VM_COST), maxCt = Math.floor(HOST/CT_COST);
+  const v = document.getElementById("verdict");
+  if (vm+ct === 0){ v.className="note ok"; v.textContent="Deploy a few workloads to compare density."; return; }
+  v.className = "note ok";
+  v.innerHTML = `This host fits about <strong>${maxVm} VMs</strong> but <strong>${maxCt} containers</strong> — roughly <strong>${Math.round(maxCt/maxVm)}× the density</strong>, because containers don't each carry a guest OS.`;
+}
+document.getElementById("deployBoth").addEventListener("click", ()=>{
+  if ((vm+1)*VM_COST <= HOST){ vm++; add("vmStack","l-red", `VM ${vm} <small>guest OS + app</small>`); }
+  if ((ct+1)*CT_COST <= HOST){ ct++; add("ctStack","l-blue", `Container ${ct} <small>app + libs</small>`); }
+  render();
+});
+document.getElementById("reset").addEventListener("click", ()=>{
+  vm=ct=0; document.getElementById("vmStack").innerHTML=""; document.getElementById("ctStack").innerHTML=""; render();
+});
+render();
+
+renderQuiz("quiz", [
+  { q: "What is the single biggest architectural difference between a VM and a container?",
+    options: [
+      "Containers are written in Go and VMs are not",
+      "Each VM runs its own full OS/kernel; containers share the host's kernel",
+      "VMs can run web servers but containers cannot",
+      "Containers always need more RAM than VMs"],
+    answer: 1,
+    explain: "A VM virtualizes hardware and ships a complete guest OS (its own kernel) per workload. Containers virtualize the OS — they share the single host kernel and package only the app + libraries." },
+  { q: "Why can a host run many more containers than VMs?",
+    options: [
+      "Containers are compressed at runtime",
+      "Containers don't each carry a guest OS, so per-workload overhead is tiny",
+      "VMs are deliberately throttled by the hypervisor",
+      "Containers run on the GPU instead of the CPU"],
+    answer: 1,
+    explain: "Because every VM duplicates an entire OS (~GBs), few fit per host. A container adds only its app + libs (~MBs), so dozens-to-hundreds fit in the same RAM." },
+  { q: "Which statement about isolation is most accurate?",
+    options: [
+      "Containers provide stronger isolation than VMs in every case",
+      "VMs and containers provide identical isolation",
+      "VMs isolate at the hardware level (stronger); containers share a kernel (strong, but a kernel flaw has wider blast radius)",
+      "Neither provides any isolation"],
+    answer: 2,
+    explain: "VM isolation is hardware-level via the hypervisor. Containers share the host kernel, so isolation is strong but a kernel vulnerability is more impactful — which is exactly why OpenShift adds Security Context Constraints (Module 7)." },
+  { q: "In a typical OpenShift cluster, how do VMs and containers relate?",
+    options: [
+      "They are mutually exclusive — you pick one",
+      "Containers run inside VMs that act as cluster nodes",
+      "VMs run inside containers",
+      "OpenShift uses neither"],
+    answer: 1,
+    explain: "It's not either/or. Cluster nodes are frequently VMs, and pods (containers) run on those nodes — combining VM-level isolation between nodes with container density inside each node." }
+]);
+</script>
+</body>
+</html>

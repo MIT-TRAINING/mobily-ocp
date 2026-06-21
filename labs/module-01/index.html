@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 1 — Interactive Visualizations | OpenShift Container Platform</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift Container Platform</a>
+  <span class="pill">Module 1 · Container Fundamentals</span>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Interactive lab · Self-paced</div>
+    <h1>Container Fundamentals — visualized</h1>
+    <p class="lede">Five hands-on, interactive visualizations that make Module 1's core concepts click — from why containers exist to how images, isolation, lifecycle, and registries actually work. Each ends with a short <strong>self-check</strong> quiz.</p>
+  </div>
+
+  <div class="card">
+    <h2>How to use this</h2>
+    <p class="sub" style="margin:0">Work through the five in order (each builds on the last) or jump to any concept. Everything runs in your browser — no install, no internet needed. Companion reading: <code>guides/module-01-container-fundamentals.md</code>.</p>
+  </div>
+
+  <div class="viz-grid">
+    <a class="viz-card" href="01-vm-vs-containers.html">
+      <span class="ix">01</span>
+      <h3>VMs vs Containers</h3>
+      <p>Pack the same host two ways and watch container density win. See the architecture stack and the shared-kernel difference.</p>
+      <div class="tags"><span class="tag">Density</span><span class="tag">Architecture</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="02-container-anatomy.html">
+      <span class="ix">02</span>
+      <h3>Anatomy of a Container</h3>
+      <p>Turn a plain process into a container by toggling namespaces (isolation) and cgroups (limits). Trigger an OOMKill.</p>
+      <div class="tags"><span class="tag">Namespaces</span><span class="tag">cgroups</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="03-image-layers.html">
+      <span class="ix">03</span>
+      <h3>Image Layers & Copy-on-Write</h3>
+      <p>Build an image layer by layer, run many containers on shared read-only layers, write data — then lose it on removal.</p>
+      <div class="tags"><span class="tag">Layers</span><span class="tag">CoW</span><span class="tag">Ephemeral</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="04-container-lifecycle.html">
+      <span class="ix">04</span>
+      <h3>Container Lifecycle</h3>
+      <p>Drive a container through created → running → paused → stopped → removed. Only valid commands are enabled at each state.</p>
+      <div class="tags"><span class="tag">State machine</span><span class="tag">Commands</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="05-build-ship-run.html">
+      <span class="ix">05</span>
+      <h3>Build → Ship → Run</h3>
+      <p>Step through build, push to a registry, and pull-and-run on two hosts — watch layer caching skip redundant downloads.</p>
+      <div class="tags"><span class="tag">Registry</span><span class="tag">Tags vs digest</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="01-vm-vs-containers.html" style="border-style:dashed;background:var(--surface-2)">
+      <span class="ix">▶</span>
+      <h3>Start here</h3>
+      <p>New to containers? Begin with visualization 01 and work straight through. ~20–30 minutes total.</p>
+      <div class="tags"><span class="tag">20 questions total</span></div>
+    </a>
+  </div>
+
+  <div class="card" style="margin-top:24px">
+    <h3 style="margin-top:0">What you'll be able to explain afterwards</h3>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li>Why containers replaced the VM-per-app model, and how they still combine with VMs</li>
+      <li>That a container is just a Linux process isolated by <strong>namespaces</strong> and limited by <strong>cgroups</strong></li>
+      <li>How layered images + copy-on-write make containers fast and storage-efficient — and why their data is ephemeral</li>
+      <li>The container lifecycle and which actions are valid in each state</li>
+      <li>The build → ship → run workflow and why registries + immutable digests matter</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

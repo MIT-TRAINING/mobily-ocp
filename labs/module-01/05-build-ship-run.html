@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build → Ship → Run — Interactive | Module 1</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .pipe { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px; align-items:start; }
+  @media (max-width:820px){ .pipe { grid-template-columns:1fr; } }
+  .node { border:2px dashed var(--line); border-radius:14px; padding:16px; background:var(--surface-2); transition:all .3s ease; }
+  .node.active { border-style:solid; border-color:var(--blue); background:var(--blue-bg); box-shadow:var(--shadow); }
+  .node h3 { margin:0 0 4px; }
+  .node .role { font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
+  .chip { display:inline-block; font-family:var(--mono); font-size:11.5px; font-weight:700; padding:3px 8px; border-radius:7px; margin:3px 3px 0 0; border:1px solid; }
+  .chip.have { background:var(--green-bg); border-color:var(--green); color:var(--green-ink); }
+  .chip.new  { background:var(--blue-bg);  border-color:var(--blue);  color:var(--blue-ink); }
+  .chip.skip { background:var(--slate-bg); border-color:var(--slate); color:var(--muted); text-decoration:line-through; }
+  .step-dot { width:10px; height:10px; border-radius:50%; background:var(--line); display:inline-block; margin-right:6px; }
+  .step-dot.done { background:var(--green); }
+  .step-dot.now  { background:var(--blue); box-shadow:0 0 0 4px var(--blue-bg); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 1</a>
+  <span class="pill">Visualization 5 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Registries & the build → ship → run model</div>
+    <h1>Build once. Ship anywhere. Run consistently.</h1>
+    <p class="lede">The cloud-native workflow in three moves: <strong>build</strong> an image, <strong>push</strong> it to a registry, then <strong>pull &amp; run</strong> it on any host or cluster. Step through it and watch layer caching avoid redundant downloads.</p>
+  </div>
+
+  <div class="card">
+    <h2>The pipeline</h2>
+    <div class="controls">
+      <button class="btn primary" id="next">▶ Next step</button>
+      <button class="btn ghost" id="reset">Reset</button>
+      <span style="margin-left:auto" id="dots"></span>
+    </div>
+
+    <div class="pipe">
+      <div class="node" id="nDev">
+        <div class="role">Developer / CI</div>
+        <h3>🛠️ Build</h3>
+        <pre style="font-size:12px;margin:8px 0">FROM ubi9
+RUN npm install
+COPY . .</pre>
+        <div id="devLayers"></div>
+      </div>
+
+      <div class="node" id="nReg">
+        <div class="role">Registry (Quay / Docker Hub)</div>
+        <h3>📦 Ship</h3>
+        <p class="sub" style="margin:6px 0">Stores image layers, addressed by tag &amp; digest.</p>
+        <div id="regLayers"><span class="sub">empty</span></div>
+      </div>
+
+      <div class="node" id="nHosts">
+        <div class="role">Any host / OpenShift node</div>
+        <h3>🚀 Run</h3>
+        <div style="margin-top:8px">
+          <strong style="font-size:13px">Host A</strong> <span class="sub">(fresh)</span>
+          <div id="hostA"><span class="sub">waiting…</span></div>
+        </div>
+        <div style="margin-top:10px">
+          <strong style="font-size:13px">Host B</strong> <span class="sub">(already has ubi9 base)</span>
+          <div id="hostB"><span class="sub">waiting…</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note" id="narrate" style="font-size:15px">Press <strong>Next step</strong> to begin the build.</div>
+  </div>
+
+  <div class="card">
+    <h2>Tags vs digests — naming the artifact</h2>
+    <div class="grid two">
+      <div>
+        <pre>registry.example.com/team/myapp:1.4.2
+└──── registry ────┘ └team┘ └app┘ └tag┘</pre>
+        <div class="note">A <strong>tag</strong> (<code>:1.4.2</code>, <code>:latest</code>) is human-friendly but <strong>mutable</strong> — <code>latest</code> can point to different content over time.</div>
+      </div>
+      <div>
+        <pre>myapp@sha256:9f86d081884c7d65...</pre>
+        <div class="note ok">A <strong>digest</strong> is a content hash — <strong>immutable</strong>. It always refers to the exact same bytes. Pin production deployments to a version tag or digest, never bare <code>latest</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="04-container-lifecycle.html">← Lifecycle</a>
+    <a class="btn primary" href="index.html">Finish — back to hub →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const LYRS = ["ubi9 base","npm deps","app code"];
+const STEPS = [
+  { node:"nDev",
+    text:"<strong>BUILD.</strong> Each Containerfile instruction produces a cached, read-only layer. The result is an image made of 3 layers.",
+    run(){ document.getElementById("devLayers").innerHTML = LYRS.map(l=>`<span class="chip new">${l}</span>`).join(""); } },
+  { node:"nReg",
+    text:"<strong>SHIP (push).</strong> <code>podman push</code> uploads the image layers to the registry, where they're stored once and addressed by tag + digest.",
+    run(){ document.getElementById("regLayers").innerHTML = LYRS.map(l=>`<span class="chip new">${l}</span>`).join(""); } },
+  { node:"nHosts",
+    text:"<strong>RUN on Host A (fresh).</strong> Host A has nothing cached, so <code>podman pull</code> downloads all 3 layers, then starts the container.",
+    run(){ document.getElementById("hostA").innerHTML = LYRS.map(l=>`<span class="chip new">${l} ⬇</span>`).join("") + '<div class="chip have" style="margin-top:6px">▶ running</div>'; } },
+  { node:"nHosts",
+    text:"<strong>RUN on Host B (warm cache).</strong> Host B already has the <code>ubi9 base</code> layer from another image — so the pull <strong>skips it</strong> and downloads only the 2 new layers. This layer de-duplication is why pulls are fast.",
+    run(){ document.getElementById("hostB").innerHTML =
+      `<span class="chip skip">ubi9 base</span>` +
+      LYRS.slice(1).map(l=>`<span class="chip new">${l} ⬇</span>`).join("") +
+      '<div class="chip have" style="margin-top:6px">▶ running</div>'; } },
+  { node:null,
+    text:"✅ <strong>Done.</strong> One image, built once, now runs identically on both hosts. Same artifact from a laptop to a production OpenShift cluster — this is the foundation of CI/CD and GitOps (Modules 9–10).",
+    run(){} },
+];
+let step = 0;
+
+function renderDots(){
+  document.getElementById("dots").innerHTML = STEPS.map((_,i)=>
+    `<span class="step-dot ${i<step?'done':i===step?'now':''}"></span>`).join("");
+}
+function highlight(id){
+  ["nDev","nReg","nHosts"].forEach(n=>document.getElementById(n).classList.toggle("active", n===id));
+}
+function doNext(){
+  if(step>=STEPS.length){ return; }
+  const s=STEPS[step];
+  s.run(); highlight(s.node);
+  document.getElementById("narrate").innerHTML = s.text;
+  step++;
+  renderDots();
+  document.getElementById("next").disabled = step>=STEPS.length;
+}
+function reset(){
+  step=0;
+  document.getElementById("devLayers").innerHTML="";
+  document.getElementById("regLayers").innerHTML='<span class="sub">empty</span>';
+  document.getElementById("hostA").innerHTML='<span class="sub">waiting…</span>';
+  document.getElementById("hostB").innerHTML='<span class="sub">waiting…</span>';
+  document.getElementById("narrate").innerHTML="Press <strong>Next step</strong> to begin the build.";
+  document.getElementById("next").disabled=false;
+  highlight(null); renderDots();
+}
+document.getElementById("next").onclick=doNext;
+document.getElementById("reset").onclick=reset;
+renderDots();
+
+renderQuiz("quiz", [
+  { q: "What is a container registry?",
+    options: ["A log of running containers","A service that stores and distributes container images",
+      "A type of firewall","The writable layer of a container"],
+    answer: 1,
+    explain: "A registry (Docker Hub, Quay, an internal registry) is the storage + distribution service for images — like a package repository for containers." },
+  { q: "Host B already has the base layer cached. What happens when it pulls the image?",
+    options: ["It re-downloads everything anyway","It downloads only the layers it doesn't already have",
+      "The pull fails","It deletes the cached layer first"],
+    answer: 1,
+    explain: "Layers are content-addressed and shared, so a pull skips layers already present locally. This de-duplication makes pulls fast and storage efficient." },
+  { q: "Why avoid deploying with the bare tag ':latest' in production?",
+    options: ["It's slower to pull","It's mutable — it can point to different content over time, so it's not reproducible",
+      "It uses more disk","Registries reject it"],
+    answer: 1,
+    explain: "Tags are mutable. ':latest' can silently change, making 'what's actually running?' unanswerable. Pin to a version tag or an immutable digest." },
+  { q: "What does the 'build once, ship anywhere, run consistently' model guarantee?",
+    options: ["The app runs faster on every host","The same image artifact runs identically across environments (laptop → cluster)",
+      "You never need a registry","Containers never need updates"],
+    answer: 1,
+    explain: "Because the image packages the app with its dependencies, the identical artifact behaves the same everywhere — solving 'works on my machine' and enabling CI/CD & GitOps." }
+]);
+</script>
+</body>
+</html>
