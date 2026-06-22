@@ -26,8 +26,8 @@
 Put this on screen and dissect it before touching the CLI:
 
 ```
-quay.io/mobily-academy/tariff-catalog:1.1
-└──┬──┘ └──────┬──────┘ └─────┬──────┘ └┬┘
+quay.io/<your-namespace>/tariff-catalog:1.1
+└──┬──┘ └─────┬──────┘ └─────┬──────┘ └┬┘
 registry   namespace        repo       tag
 ```
 
@@ -59,14 +59,14 @@ Login Succeeded!
 ## Step 2 — (Re)build and tag for the registry
 
 If the image from Demo 2 is gone, rebuild it, then tag it with the full registry
-path. Replace `mobily-academy` with **your own** namespace.
+path. Replace `<your-namespace>` with **your own** Quay.io namespace.
 
 ```bash
 cd ~/tariff-catalog
 podman build -t tariff-catalog:1.1 .
 
 # Tag the local image with the remote reference
-podman tag tariff-catalog:1.1 quay.io/mobily-academy/tariff-catalog:1.1
+podman tag tariff-catalog:1.1 quay.io/<your-namespace>/tariff-catalog:1.1
 podman images | grep tariff
 ```
 
@@ -78,7 +78,7 @@ podman images | grep tariff
 ## Step 3 — Push to the registry
 
 ```bash
-podman push quay.io/mobily-academy/tariff-catalog:1.1
+podman push quay.io/<your-namespace>/tariff-catalog:1.1
 ```
 
 **Expected output** — note layers upload individually (and shared layers are
@@ -99,12 +99,12 @@ Writing manifest to image destination
 ## Step 4 — Note the digest (immutable identity)
 
 ```bash
-podman inspect quay.io/mobily-academy/tariff-catalog:1.1 \
+podman inspect quay.io/<your-namespace>/tariff-catalog:1.1 \
   --format '{{index .RepoDigests 0}}'
 ```
 
 ```
-quay.io/mobily-academy/tariff-catalog@sha256:9f86d081884c7d659a2feaa0c55ad015...
+quay.io/<your-namespace>/tariff-catalog@sha256:9f86d081884c7d659a2feaa0c55ad015...
 ```
 
 > **Narrate:** The **tag** `1.1` is mutable — we could overwrite it tomorrow. The
@@ -119,9 +119,9 @@ Remove the local copies so the next pull must come from the registry — this
 mimics a fresh OpenShift node:
 
 ```bash
-podman rmi quay.io/mobily-academy/tariff-catalog:1.1 tariff-catalog:1.1
-podman pull quay.io/mobily-academy/tariff-catalog:1.1
-podman run -d --name tariff -p 8080:8080 quay.io/mobily-academy/tariff-catalog:1.1
+podman rmi quay.io/<your-namespace>/tariff-catalog:1.1 tariff-catalog:1.1
+podman pull quay.io/<your-namespace>/tariff-catalog:1.1
+podman run -d --name tariff -p 8080:8080 quay.io/<your-namespace>/tariff-catalog:1.1
 curl -s http://localhost:8080/health
 ```
 
@@ -149,7 +149,7 @@ podman pull quay.io/mobily-academy/tariff-catalog@sha256:9f86d0...   # paste ful
 
 ```bash
 podman rm -f tariff
-podman rmi quay.io/mobily-academy/tariff-catalog:1.1 2>/dev/null
+podman rmi quay.io/<your-namespace>/tariff-catalog:1.1 2>/dev/null
 podman logout quay.io
 ```
 
@@ -157,6 +157,6 @@ podman logout quay.io
 
 ## Wrap-up questions to pose
 
-1. What are the four parts of `quay.io/mobily-academy/tariff-catalog:1.1`?
+1. What are the four parts of `quay.io/<your-namespace>/tariff-catalog:1.1`?
 2. Why would you deploy production workloads by **digest** instead of `:latest`?
 3. During the push, why were some layers skipped?

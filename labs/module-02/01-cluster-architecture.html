@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cluster Architecture — Interactive | Module 2</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .cluster { display:grid; gap:18px; }
+  .plane {
+    border:2px solid var(--line); border-radius:14px; padding:16px;
+    background:var(--surface-2);
+  }
+  .plane h3 { margin:0 0 4px; font-size:15px; letter-spacing:-.01em; }
+  .plane .planesub { color:var(--muted); font-size:13px; margin:0 0 12px; }
+  .comp-grid { display:grid; gap:10px; grid-template-columns:repeat(3,1fr); }
+  @media (max-width:760px){ .comp-grid { grid-template-columns:1fr 1fr; } }
+  .comp {
+    cursor:pointer; border:2px solid var(--line); border-radius:11px; padding:12px 12px;
+    background:var(--surface); text-align:left; font-family:inherit; font-size:13.5px; font-weight:700;
+    color:var(--ink); transition:all .15s ease; position:relative;
+  }
+  .comp small { display:block; font-weight:500; color:var(--muted); margin-top:3px; font-size:11.5px; }
+  .comp:hover { border-color:var(--blue); transform:translateY(-2px); box-shadow:var(--shadow); }
+  .comp.sel { border-color:var(--blue); background:var(--blue-bg); color:var(--blue-ink); box-shadow:var(--shadow); }
+  .comp.api { border-color:var(--red); }
+  .comp.api.sel { background:var(--red-bg); border-color:var(--red); color:var(--red-ink); }
+  .comp.etcd { border-color:var(--amber); }
+  .comp.etcd.sel { background:var(--amber-bg); border-color:var(--amber); color:var(--amber-ink); }
+  .worker .comp { border-color:var(--green); }
+  .worker .comp.sel { background:var(--green-bg); border-color:var(--green); color:var(--green-ink); }
+  .flow .comp:not(.api){ opacity:.42; }
+  .flow .comp.api{ box-shadow:0 0 0 4px rgba(220,38,38,.18); }
+  .detail { min-height:96px; }
+  .badge { display:inline-block; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; margin-left:6px; vertical-align:1px; }
+  .badge.cp { background:var(--red-bg); color:var(--red-ink); }
+  .badge.node { background:var(--green-bg); color:var(--green-ink); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 2</a>
+  <span class="pill">Visualization 1 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Cluster architecture</div>
+    <h1>One cluster, two kinds of machine.</h1>
+    <p class="lede">A Kubernetes cluster is a <strong>control plane</strong> (the brain that decides and stores state) plus <strong>worker nodes</strong> (the muscle that runs your pods). Click any component to learn its job — and flip on <em>data-flow</em> to see why <strong>everything goes through the API server</strong>.</p>
+  </div>
+
+  <div class="card">
+    <h2>Explore the components</h2>
+    <p class="sub">Each box is a real process in the cluster. Select one to read what it does. <strong>Telecom lens:</strong> the workloads here are the operator's subscriber API, CDR processor, and SMS gateway.</p>
+
+    <div class="controls">
+      <label class="toggle" id="flowToggle"><input type="checkbox" id="flowChk"> Show data-flow (everything → API server)</label>
+      <button class="btn ghost" id="clearSel">Clear selection</button>
+    </div>
+
+    <div class="cluster" id="cluster">
+      <div class="plane" id="cpPlane">
+        <h3>🧠 Control Plane <span class="badge cp">decides &amp; stores</span></h3>
+        <p class="planesub">Runs on 1 node (dev) or 3 nodes (HA / OpenShift default). Makes global decisions; never runs your app pods.</p>
+        <div class="comp-grid">
+          <button class="comp api" data-k="api">kube-apiserver<small>the front door</small></button>
+          <button class="comp etcd" data-k="etcd">etcd<small>state store</small></button>
+          <button class="comp" data-k="sched">kube-scheduler<small>places pods</small></button>
+          <button class="comp" data-k="cm">controller-manager<small>reconciles</small></button>
+          <button class="comp" data-k="ccm">cloud-controller<small>cloud integration</small></button>
+          <button class="comp" data-k="dns">CoreDNS<small>service discovery</small></button>
+        </div>
+      </div>
+
+      <div class="plane worker" id="wPlane">
+        <h3>💪 Worker Nodes <span class="badge node">run the pods</span></h3>
+        <p class="planesub">Where your containers actually run. Every worker runs these three components.</p>
+        <div class="comp-grid">
+          <button class="comp" data-k="kubelet">kubelet<small>node agent</small></button>
+          <button class="comp" data-k="crio">CRI-O runtime<small>runs containers</small></button>
+          <button class="comp" data-k="proxy">kube-proxy<small>service routing</small></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="note detail" id="detail">Select a component above to see what it does, or toggle <strong>data-flow</strong> to see the hub-and-spoke pattern.</div>
+  </div>
+
+  <div class="card">
+    <h2>The two golden rules</h2>
+    <div class="grid two">
+      <div class="layer l-red" style="flex-direction:column;align-items:flex-start;gap:4px">
+        <strong>1 · Everything goes through the API server</strong>
+        <small>No component edits etcd or another component directly. You, the scheduler, the controllers, and every kubelet all talk only to kube-apiserver. One front door = one place for auth, validation, and audit.</small>
+      </div>
+      <div class="layer l-amber" style="flex-direction:column;align-items:flex-start;gap:4px">
+        <strong>2 · etcd is the only place state lives</strong>
+        <small>Every other component is effectively stateless — it can crash and rebuild its view by reading from the API server. Back up etcd and you back up the whole cluster.</small>
+      </div>
+    </div>
+    <div class="note">In production (and OpenShift by default) the control plane runs on <strong>3 nodes</strong>. etcd uses <strong>Raft</strong> consensus and needs a <strong>quorum</strong> (majority) — which is why you want an <strong>odd</strong> number. Lose 1 of 3 and the cluster keeps working.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <p class="sub">Answer all four to test your understanding.</p>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="index.html">← Hub</a>
+    <a class="btn primary" href="02-reconciliation-loop.html">Next: Desired state &amp; self-healing →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const INFO = {
+  api:    { t:"kube-apiserver — the front door", d:"The <strong>only</strong> component that talks to etcd, and the single REST entry point for everyone else. It runs <strong>authentication → authorization (RBAC) → admission control</strong>, validates objects, and persists them to etcd. It also serves <strong>watches</strong> so other components are notified of changes instead of polling. Stateless and horizontally scalable." },
+  etcd:   { t:"etcd — the cluster's source of truth", d:"A distributed, strongly-consistent <strong>key-value store</strong> holding the entire cluster state (every object's spec and status). Uses the <strong>Raft</strong> consensus protocol and needs a <strong>quorum</strong> to accept writes. Only the API server reads/writes it. <strong>Backing up etcd = backing up the cluster.</strong>" },
+  sched:  { t:"kube-scheduler — places pods on nodes", d:"Watches for pods with no node assigned, then <strong>filters</strong> nodes that can't fit (resources, taints, affinity) and <strong>scores</strong> the rest to pick the best. It writes a binding back through the API server — it <strong>chooses</strong>, it does not run. (Visualization 03 dives in.)" },
+  cm:     { t:"kube-controller-manager — the reconciliation engine", d:"Runs the control loops that drive actual state toward desired state: <strong>node, ReplicaSet, Deployment, endpoints, job</strong> controllers and more. This is where <strong>self-healing</strong> lives — kill a pod and the ReplicaSet controller makes a new one. (Visualization 02 shows it in action.)" },
+  ccm:    { t:"cloud-controller-manager — cloud integration", d:"Isolates all cloud-provider-specific logic (AWS/Azure/GCP) so the core stays cloud-agnostic: provisions cloud <strong>load balancers</strong> for Services, attaches cloud <strong>volumes</strong>, and reads node zone/region metadata. May be minimal or absent on bare metal." },
+  dns:    { t:"CoreDNS — service discovery by name", d:"In-cluster DNS so workloads find each other by <strong>name</strong>, not by ephemeral IP. A Service <code>subscriber-api</code> in namespace <code>selfcare</code> resolves to <code>subscriber-api.selfcare.svc.cluster.local</code>. Pods restart with new IPs constantly — the name never changes. (Visualization 05.)" },
+  kubelet:{ t:"kubelet — the node's agent", d:"The agent on every node. It <strong>watches the API server for pods assigned to its node</strong>, drives the container runtime (via the CRI) to run them, runs health probes, and <strong>reports pod/container status</strong> back. It's the reconciliation loop at the node level — it never schedules, only runs what it's told." },
+  crio:   { t:"CRI-O — the container runtime", d:"What actually pulls images and runs containers. The kubelet speaks to it through the standard <strong>CRI (Container Runtime Interface)</strong>, so any compliant runtime plugs in. OpenShift uses <strong>CRI-O</strong> (with <code>crun</code> underneath), not the Docker daemon — your OCI images run unchanged." },
+  proxy:  { t:"kube-proxy — makes Services reachable", d:"Watches Services and their <strong>Endpoints</strong> (current healthy pod IPs) and programs the node's networking (<strong>iptables/IPVS</strong>) so traffic to a Service's stable virtual IP is load-balanced to a real backing pod. It programs kernel rules — it's not in the data path itself. (Visualization 05.)" },
+};
+let selected = null;
+
+function paint(){
+  document.querySelectorAll(".comp").forEach(c=>c.classList.toggle("sel", c.dataset.k===selected));
+  const cluster = document.getElementById("cluster");
+  cluster.classList.toggle("flow", document.getElementById("flowChk").checked);
+  document.getElementById("flowToggle").classList.toggle("on", document.getElementById("flowChk").checked);
+  const det = document.getElementById("detail");
+  if (document.getElementById("flowChk").checked && !selected){
+    det.className = "note warn detail";
+    det.innerHTML = "<strong>Hub &amp; spoke.</strong> Notice everything dims except <strong>kube-apiserver</strong>. The scheduler, controllers, kubelets, and your <code>kubectl</code> commands all talk <em>only</em> to the API server — never to etcd or each other directly. That single front door is where security and consistency are enforced.";
+    return;
+  }
+  if (!selected){
+    det.className = "note detail";
+    det.innerHTML = "Select a component above to see what it does, or toggle <strong>data-flow</strong> to see the hub-and-spoke pattern.";
+    return;
+  }
+  const i = INFO[selected];
+  det.className = "note detail fade-in";
+  det.innerHTML = `<strong>${i.t}</strong><br>${i.d}`;
+}
+document.querySelectorAll(".comp").forEach(c=>{
+  c.addEventListener("click", ()=>{ selected = (selected===c.dataset.k)? null : c.dataset.k; paint(); });
+});
+document.getElementById("flowChk").addEventListener("change", paint);
+document.getElementById("clearSel").addEventListener("click", ()=>{ selected=null; paint(); });
+paint();
+
+renderQuiz("quiz", [
+  { q: "Which component is the <em>only</em> one that reads from and writes to etcd?",
+    options: ["kube-scheduler","kubelet","kube-apiserver","kube-controller-manager"],
+    answer: 2,
+    explain: "Everything funnels through the kube-apiserver. No other component — not the scheduler, controllers, or kubelets — touches etcd directly. That centralizes authentication, authorization, validation, and audit in one place." },
+  { q: "What is the correct split of responsibilities?",
+    options: [
+      "Control plane runs the app pods; worker nodes make scheduling decisions",
+      "Control plane decides and stores cluster state; worker nodes run the pods",
+      "Both run app pods equally; there is no real difference",
+      "Worker nodes store all cluster state in etcd"],
+    answer: 1,
+    explain: "The control plane is the brain (API server, etcd, scheduler, controllers) — it decides and stores state. Worker nodes are the muscle (kubelet, CRI-O, kube-proxy) — they actually run your containers." },
+  { q: "Why do production clusters run an <strong>odd</strong> number of etcd members (e.g. 3)?",
+    options: [
+      "Odd numbers boot faster",
+      "etcd uses Raft consensus and needs a quorum (majority) to accept writes",
+      "Kubernetes only supports odd numbers",
+      "To leave one member idle as a spare"],
+    answer: 1,
+    explain: "etcd is strongly consistent via the Raft protocol, which needs a majority (quorum) to agree on writes. An odd count maximizes fault tolerance per node — with 3 you can lose 1 and still have quorum." },
+  { q: "Which three components run on every worker node?",
+    options: [
+      "apiserver, etcd, scheduler",
+      "kubelet, container runtime (CRI-O), kube-proxy",
+      "controller-manager, CoreDNS, etcd",
+      "scheduler, kube-proxy, etcd"],
+    answer: 1,
+    explain: "Every worker runs the kubelet (node agent), a container runtime like CRI-O (actually runs containers via the CRI), and kube-proxy (programs node networking so Service IPs reach live pods)." }
+]);
+</script>
+</body>
+</html>

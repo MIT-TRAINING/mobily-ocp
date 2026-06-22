@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Services, Labels & DNS — Interactive | Module 2</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .svc-box {
+    border:2px solid var(--amber); background:var(--amber-bg); border-radius:12px;
+    padding:14px 16px; display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:space-between;
+  }
+  .svc-box .dns { font-family:var(--mono); font-size:13px; color:var(--amber-ink); font-weight:700; }
+  .svc-box .cip { font-family:var(--mono); font-size:13px; color:var(--ink-soft); }
+  .selchip {
+    font-family:var(--mono); font-size:12.5px; font-weight:750; padding:4px 10px; border-radius:999px;
+    background:#fff; border:1.5px solid var(--amber); color:var(--amber-ink);
+  }
+  .pods { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:6px 0; }
+  @media (max-width:760px){ .pods { grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:420px){ .pods { grid-template-columns:1fr; } }
+  .pod {
+    border:2px solid var(--line); border-radius:11px; padding:11px 12px; background:var(--surface);
+    transition:all .25s ease; position:relative;
+  }
+  .pod.endpoint { border-color:var(--green); background:var(--green-bg); box-shadow:var(--shadow); }
+  .pod.dropped  { opacity:.55; border-style:dashed; }
+  .pod .pname { font-weight:750; font-size:13.5px; }
+  .pod .pip   { font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-bottom:8px; }
+  .pod .lblbtn {
+    font-family:var(--mono); font-size:11px; font-weight:700; border:1px solid var(--line);
+    background:var(--surface-2); border-radius:7px; padding:3px 7px; cursor:pointer; width:100%; text-align:left; margin-bottom:6px;
+  }
+  .pod .lblbtn.match { color:var(--blue-ink); border-color:var(--blue); background:var(--blue-bg); }
+  .pod .hits {
+    position:absolute; top:8px; right:8px; font-family:var(--mono); font-size:11px; font-weight:800;
+    background:var(--green); color:#fff; border-radius:999px; min-width:20px; text-align:center; padding:1px 6px;
+    opacity:0; transition:opacity .2s ease;
+  }
+  .pod .hits.show { opacity:1; }
+  .pod .status { font-size:11.5px; font-weight:700; }
+  .pod .status.up { color:var(--green-ink); } .pod .status.down { color:var(--red-ink); }
+  .badge-ep { display:inline-block; font-size:10.5px; font-weight:800; color:var(--green-ink); background:#fff; border:1px solid var(--green); border-radius:999px; padding:1px 7px; margin-top:6px; }
+  .eplist { font-family:var(--mono); font-size:12.5px; background:#0f172a; color:#e2e8f0; border-radius:10px; padding:12px; min-height:54px; }
+  .eplist .ep { color:#86efac; }
+  .eplist .none { color:#fca5a5; }
+  .reqlog { font-family:var(--mono); font-size:12.5px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:10px 12px; max-height:140px; overflow:auto; margin-top:10px; }
+  .reqlog div { padding:1px 0; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 2</a>
+  <span class="pill">Visualization 5 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Service discovery, labels & DNS</div>
+    <h1>Pods churn. The <code>Service</code> stays put.</h1>
+    <p class="lede">Pods are born and die with fresh IPs all day long — but callers never chase those IPs. They use one stable <strong>name</strong>. Toggle pod labels and health below and watch the Service's <strong>endpoints</strong> and <strong>load-balancing</strong> recompute live.</p>
+  </div>
+
+  <div class="card">
+    <h2>The <code>subscriber-api</code> Service</h2>
+    <div class="svc-box">
+      <div>
+        <div class="dns">subscriber-api.selfcare.svc.cluster.local</div>
+        <div class="cip">ClusterIP 172.30.42.10 : 8080 &nbsp;·&nbsp; <strong>stable, never changes</strong></div>
+      </div>
+      <div class="selchip">selector: app=subscriber-api</div>
+    </div>
+    <p class="sub" style="margin:12px 0 0">A Service does <strong>not</strong> list pod IPs. It declares a <strong>selector</strong>. The endpoints controller continuously watches for pods that (1) <strong>match the selector</strong> and (2) are <strong>Ready</strong>, and keeps the endpoint list in sync. Change anything below and watch it react.</p>
+  </div>
+
+  <div class="card">
+    <h2>The pods (your fleet)</h2>
+    <p class="sub" style="margin:-2px 0 12px">Click a pod's <strong>label</strong> to flip it in/out of the selector. Toggle <strong>Ready</strong> to simulate a failing health probe. A pod is an <strong>endpoint</strong> only when it both matches <em>and</em> is Ready.</p>
+    <div class="pods" id="pods"></div>
+    <div class="controls" style="margin-top:14px">
+      <button class="btn red" id="kill">💥 Kill a random pod</button>
+      <button class="btn green" id="add">➕ Scale up (+1 pod)</button>
+      <button class="btn ghost" id="reset">↺ Reset</button>
+      <span class="sub" id="epcount" style="margin:0"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Live endpoints behind the Service</h2>
+    <div class="eplist" id="eplist"></div>
+    <div class="controls" style="margin-top:14px">
+      <button class="btn primary" id="send">▶ Send 8 requests to the Service</button>
+      <button class="btn ghost" id="clearlog">Clear log</button>
+    </div>
+    <div class="reqlog" id="reqlog"><div style="color:var(--muted)">Requests hit the ClusterIP and kube-proxy load-balances them across the <em>current</em> endpoints…</div></div>
+  </div>
+
+  <div class="card">
+    <h2>The one takeaway</h2>
+    <div class="note">You never typed a pod IP. Callers resolve <code>subscriber-api</code> via DNS to one stable ClusterIP; <strong>labels + selectors</strong> decide membership and <strong>readiness</strong> decides eligibility, so the endpoint set self-adjusts as pods come, go, and fail. That decoupling is exactly why a dynamic, self-healing cluster stays usable.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="04-pod-creation-flow.html">← Anatomy of kubectl apply</a>
+    <a class="btn primary" href="index.html">Finish — back to all visualizations →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const SELECTOR = "app=subscriber-api";
+let seq = 0;
+let rr = 0; // round-robin cursor for load balancing
+function newIp(){ return "10.1" + (28 + Math.floor(Math.random()*3)) + "." + (Math.floor(Math.random()*4)) + "." + (1 + Math.floor(Math.random()*250)); }
+function freshPods(){
+  seq = 0; rr = 0;
+  return [
+    mkPod(true,  true),
+    mkPod(true,  true),
+    mkPod(true,  false),  // matches but failing readiness
+    mkPod(false, true),   // wrong label (app=billing)
+  ];
+}
+function mkPod(match, ready){
+  seq++;
+  return { id: seq, name: "subscriber-api-" + Math.random().toString(36).slice(2,7), ip: newIp(), match, ready, hits: 0 };
+}
+let pods = freshPods();
+
+function isEndpoint(p){ return p.match && p.ready; }
+function endpoints(){ return pods.filter(isEndpoint); }
+
+function render(){
+  const grid = document.getElementById("pods");
+  grid.innerHTML = "";
+  pods.forEach(p=>{
+    const ep = isEndpoint(p);
+    const el = document.createElement("div");
+    el.className = "pod fade-in" + (ep ? " endpoint" : "") + (p.match ? "" : "");
+    el.innerHTML =
+      `<div class="hits${p.hits>0?' show':''}" data-h="${p.id}">${p.hits}</div>`+
+      `<div class="pname">${p.name}</div>`+
+      `<div class="pip">${p.ip}</div>`+
+      `<button class="lblbtn ${p.match?'match':''}" data-lbl="${p.id}">app=${p.match?'subscriber-api':'billing'}</button>`+
+      `<label class="toggle ${p.ready?'on':''}" style="width:100%;justify-content:space-between;padding:5px 9px;font-size:12px">`+
+        `Ready <input type="checkbox" data-rdy="${p.id}" ${p.ready?'checked':''}></label>`+
+      (ep ? `<div class="badge-ep">✓ endpoint</div>` : `<div class="status ${p.ready?'down':'down'}" style="margin-top:6px;color:var(--muted)">${p.match? (p.ready?'':'not Ready — excluded') : 'label mismatch — excluded'}</div>`);
+    grid.appendChild(el);
+  });
+  grid.querySelectorAll("[data-lbl]").forEach(b=> b.addEventListener("click", ()=>{
+    const p = pods.find(x=>x.id==b.dataset.lbl); p.match = !p.match; render();
+  }));
+  grid.querySelectorAll("[data-rdy]").forEach(c=> c.addEventListener("change", ()=>{
+    const p = pods.find(x=>x.id==c.dataset.rdy); p.ready = c.checked; render();
+  }));
+
+  const eps = endpoints();
+  const epl = document.getElementById("eplist");
+  if(eps.length){
+    epl.innerHTML = `<div>Endpoints/subscriber-api  (${eps.length} ready)</div>` +
+      eps.map(p=>`<div class="ep">  • ${p.ip}:8080   <span style="color:#64748b">→ ${p.name}</span></div>`).join("");
+  } else {
+    epl.innerHTML = `<div class="none">Endpoints/subscriber-api  (0 ready)</div><div class="none">  ✗ no Ready pods match the selector — the Service has nowhere to send traffic (503).</div>`;
+  }
+  document.getElementById("epcount").textContent =
+    `${eps.length} of ${pods.length} pods are endpoints (match ${SELECTOR} AND Ready).`;
+}
+
+function reqLine(html){
+  const l = document.getElementById("reqlog");
+  const d = document.createElement("div"); d.innerHTML = html; l.appendChild(d); l.scrollTop = l.scrollHeight;
+}
+
+document.getElementById("send").addEventListener("click", ()=>{
+  const eps = endpoints();
+  reqLine(`<strong>$ curl http://subscriber-api:8080/lookup</strong>  <span style="color:#64748b">(×8 via ClusterIP 172.30.42.10)</span>`);
+  if(!eps.length){
+    reqLine(`<span style="color:var(--red-ink)">→ HTTP 503: no endpoints available</span>`);
+    return;
+  }
+  for(let n=1; n<=8; n++){
+    const p = eps[rr % eps.length]; rr++;
+    p.hits++;
+    reqLine(`<span style="color:var(--green-ink)">req ${n} → ${p.ip}  (${p.name})  200 OK</span>`);
+  }
+  render();
+});
+
+document.getElementById("kill").addEventListener("click", ()=>{
+  if(!pods.length) return;
+  const victim = pods[Math.floor(Math.random()*pods.length)];
+  reqLine(`<span style="color:var(--red-ink)">✗ pod ${victim.name} (${victim.ip}) terminated</span>`);
+  pods = pods.filter(p=>p!==victim);
+  // ReplicaSet self-heals: a replacement appears with a NEW IP, same label, Ready
+  setTimeout(()=>{
+    const repl = mkPod(true, true);
+    pods.push(repl);
+    reqLine(`<span style="color:var(--blue-ink)">↻ ReplicaSet created ${repl.name} (${repl.ip}) — new IP, same label, auto-added to endpoints</span>`);
+    render();
+  }, 450);
+  render();
+});
+
+document.getElementById("add").addEventListener("click", ()=>{
+  const p = mkPod(true, true); pods.push(p);
+  reqLine(`<span style="color:var(--green-ink)">➕ scaled up: ${p.name} (${p.ip}) joined the endpoints</span>`);
+  render();
+});
+
+document.getElementById("reset").addEventListener("click", ()=>{
+  pods = freshPods();
+  document.getElementById("reqlog").innerHTML = `<div style="color:var(--muted)">Requests hit the ClusterIP and kube-proxy load-balances them across the <em>current</em> endpoints…</div>`;
+  render();
+});
+document.getElementById("clearlog").addEventListener("click", ()=>{
+  document.getElementById("reqlog").innerHTML = `<div style="color:var(--muted)">Cleared.</div>`;
+});
+
+render();
+
+renderQuiz("quiz", [
+  { q: "A pod matches the Service's <code>selector</code> but its readiness probe is failing. Is it an endpoint?",
+    options: [
+      "Yes — matching the selector is enough",
+      "No — it must match the selector AND be Ready to receive traffic",
+      "Yes, but only for half the requests",
+      "Only if it is the oldest pod"],
+    answer: 1,
+    explain: "Endpoint membership requires both: the pod's labels satisfy the selector AND the pod is Ready. A failing readiness probe pulls a pod out of the endpoint list so the Service stops sending it traffic — without deleting the pod." },
+  { q: "A pod is killed and the ReplicaSet creates a replacement with a brand-new IP. What must the caller change?",
+    options: [
+      "Update its config with the new pod IP",
+      "Nothing — it still uses the stable Service name/ClusterIP; endpoints update automatically",
+      "Restart to flush its DNS cache for the pod",
+      "Add the new IP to /etc/hosts"],
+    answer: 1,
+    explain: "Callers target the Service (stable name → stable ClusterIP). The endpoints controller swaps the dead pod's IP for the new one behind the scenes. Never hard-code a pod IP — that is the whole point of Services." },
+  { q: "What does <code>subscriber-api.selfcare.svc.cluster.local</code> resolve to?",
+    options: [
+      "A random pod's IP, rotated each lookup",
+      "The Service's stable ClusterIP (kube-proxy then balances to a live pod)",
+      "The IP of the etcd leader",
+      "The node the first pod runs on"],
+    answer: 1,
+    explain: "CoreDNS resolves the Service FQDN to its ClusterIP. That virtual IP is stable; kube-proxy's node rules (iptables/IPVS) then DNAT-balance each connection to one of the current Ready endpoints." },
+  { q: "All matching pods become NotReady at once. What happens to requests hitting the Service?",
+    options: [
+      "They queue until a pod recovers",
+      "They are sent to NotReady pods anyway",
+      "There are no endpoints, so the Service has nowhere to route — requests fail (e.g. 503)",
+      "kube-proxy starts a new pod itself"],
+    answer: 2,
+    explain: "With zero Ready endpoints the Service backend list is empty and there is nothing to load-balance to, so traffic fails. Readiness gating is protective — it stops traffic to unhealthy pods — but if everything is unhealthy, the Service has no one to serve." }
+]);
+</script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 2 — Interactive Visualizations | OpenShift Container Platform</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift Container Platform</a>
+  <span class="pill">Module 2 · Kubernetes Architecture</span>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Interactive lab · Self-paced</div>
+    <h1>Kubernetes Architecture — visualized</h1>
+    <p class="lede">Five hands-on, interactive visualizations that make Module 2's core concepts click — how a cluster is wired, how the control plane keeps your apps alive, how the scheduler places pods, what really happens when you create one, and how Services find the right pods. Each ends with a short <strong>self-check</strong> quiz.</p>
+  </div>
+
+  <div class="card">
+    <h2>How to use this</h2>
+    <p class="sub" style="margin:0">Work through the five in order (each builds on the last) or jump to any concept. Everything runs in your browser — no install, no internet, no cluster needed. Companion reading: <code>guides/module-02-kubernetes-architecture.md</code>. Then practice for real with the guided <a href="demos/README.md">demos</a> and <a href="exercises/README.md">exercises</a> using <code>kubectl</code> on a <a href="../setup/minikube-kubernetes.md">minikube</a> cluster.</p>
+  </div>
+
+  <div class="viz-grid">
+    <a class="viz-card" href="01-cluster-architecture.html">
+      <span class="ix">01</span>
+      <h3>Cluster Architecture</h3>
+      <p>Tour the control plane and worker nodes. Click any component to see its job, and watch why <strong>everything flows through the API server</strong>.</p>
+      <div class="tags"><span class="tag">Control plane</span><span class="tag">Nodes</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="02-reconciliation-loop.html">
+      <span class="ix">02</span>
+      <h3>Desired State & Self-Healing</h3>
+      <p>Set the desired replica count, then kill pods and crash a node — watch the controllers reconcile actual state back to what you declared.</p>
+      <div class="tags"><span class="tag">Reconciliation</span><span class="tag">Controllers</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="03-scheduler.html">
+      <span class="ix">03</span>
+      <h3>The Scheduler: Filter &amp; Score</h3>
+      <p>Give a pod resource requests, node selectors, and tolerations — then watch the scheduler <strong>filter</strong> feasible nodes and <strong>score</strong> the best one.</p>
+      <div class="tags"><span class="tag">Filter</span><span class="tag">Score</span><span class="tag">Taints</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="04-pod-creation-flow.html">
+      <span class="ix">04</span>
+      <h3>Anatomy of <code>kubectl apply</code></h3>
+      <p>Step through what happens when you create a Deployment — API server, etcd, controllers, scheduler, kubelet, CRI-O — each actor reacting to a watch.</p>
+      <div class="tags"><span class="tag">Request flow</span><span class="tag">Watches</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="05-services-discovery.html">
+      <span class="ix">05</span>
+      <h3>Services, Labels &amp; DNS</h3>
+      <p>Pods come and go with new IPs, but the Service name stays stable. Toggle pod labels and health to see endpoints and load-balancing update live.</p>
+      <div class="tags"><span class="tag">Selectors</span><span class="tag">Endpoints</span><span class="tag">DNS</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="01-cluster-architecture.html" style="border-style:dashed;background:var(--surface-2)">
+      <span class="ix">▶</span>
+      <h3>Start here</h3>
+      <p>New to Kubernetes architecture? Begin with visualization 01 and work straight through. ~25–35 minutes total.</p>
+      <div class="tags"><span class="tag">20 questions total</span></div>
+    </a>
+  </div>
+
+  <div class="card" style="margin-top:24px">
+    <h3 style="margin-top:0">What you'll be able to explain afterwards</h3>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li>How a cluster splits into a <strong>control plane</strong> (brain) and <strong>worker nodes</strong> (muscle), and why every component talks through the <strong>API server</strong></li>
+      <li>The roles of <strong>kube-apiserver, etcd, scheduler, controller-manager, kubelet, container runtime (CRI-O), and kube-proxy</strong></li>
+      <li>The <strong>desired-state + reconciliation</strong> model — the source of Kubernetes self-healing and scaling</li>
+      <li>How the <strong>scheduler</strong> places pods using filtering (predicates) and scoring (priorities)</li>
+      <li>The end-to-end <strong>pod-creation flow</strong>, and how <strong>labels, Services, endpoints, and DNS</strong> deliver stable service discovery</li>
+    </ul>
+  </div>
+
+  <div class="card" style="margin-top:6px">
+    <h3 style="margin-top:0">Then take it to a real cluster</h3>
+    <p class="sub" style="margin:0 0 6px">The visualizations build the mental model; these apply it on a real Kubernetes cluster (<a href="../setup/minikube-kubernetes.md">minikube</a>) with <code>kubectl</code>:</p>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li><a href="demos/README.md"><strong>Guided demos</strong></a> — instructor-led tours of the live cluster (explore architecture, watch self-healing, influence the scheduler, trace a pod's birth, service discovery).</li>
+      <li><a href="exercises/README.md"><strong>Exercises</strong></a> — you drive, with validation steps and worked solutions.</li>
+      <li><a href="cheetsheets/README.md"><strong>Cheat sheets</strong></a> — quick <code>kubectl</code> command reference for inspecting cluster architecture.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

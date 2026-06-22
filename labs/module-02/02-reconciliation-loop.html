@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Desired State &amp; Self-Healing — Interactive | Module 2</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .podfield { display:flex; flex-wrap:wrap; gap:10px; min-height:78px; padding:14px; border:2px dashed var(--line); border-radius:12px; background:var(--surface-2); }
+  .pod {
+    width:74px; height:60px; border-radius:10px; border:2px solid var(--green); background:var(--green-bg);
+    color:var(--green-ink); font-size:11px; font-weight:750; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:2px; position:relative; transition:all .3s ease;
+  }
+  .pod .ip { font-family:var(--mono); font-size:10px; font-weight:600; color:var(--ink-soft); }
+  .pod.dying { border-color:var(--red); background:var(--red-bg); color:var(--red-ink); transform:scale(.85); opacity:.25; }
+  .pod.new { animation:fade .4s ease both; }
+  .pod .node { font-size:9px; color:var(--muted); }
+  .statebar { display:flex; gap:18px; flex-wrap:wrap; align-items:center; margin:6px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:15px; padding:6px 12px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .rlog { font-family:var(--mono); font-size:12.5px; background:#0f172a; color:#e2e8f0; border-radius:10px; padding:12px; max-height:200px; overflow:auto; }
+  .rlog div { padding:1.5px 0; }
+  .rlog .ctrl { color:#c4b5fd; } .rlog .ok { color:#86efac; } .rlog .warn { color:#fca5a5; } .rlog .you { color:#7dd3fc; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 2</a>
+  <span class="pill">Visualization 2 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Desired state &amp; the reconciliation loop</div>
+    <h1>You declare. Kubernetes keeps it true.</h1>
+    <p class="lede">You never start pods one by one. You declare a <strong>desired</strong> count, and a controller continuously drives <strong>actual</strong> state to match — restarting failed pods and replacing whole nodes. Break things below and watch it self-heal.</p>
+  </div>
+
+  <div class="card">
+    <h2>SubscriberAPI Deployment</h2>
+    <p class="sub">This is a Deployment of the operator's <code>subscriber-api</code>. Set the desired replicas, then disrupt the system and watch the <strong>ReplicaSet controller</strong> react.</p>
+
+    <div class="slider-row">
+      <label>Desired replicas</label>
+      <input type="range" id="desired" min="0" max="8" value="4">
+      <span class="val" id="desiredVal">4</span>
+    </div>
+
+    <div class="statebar">
+      <span class="counter" id="cDesired">desired: 4</span>
+      <span class="counter" id="cActual">actual: 4</span>
+      <span class="counter" id="cStatus">in sync ✓</span>
+    </div>
+
+    <div class="controls" style="margin-top:12px">
+      <button class="btn red" id="killOne">💥 Kill a random pod</button>
+      <button class="btn amber" id="crashNode">🖥️ Crash a node (evict its pods)</button>
+      <button class="btn ghost" id="reset">Reset</button>
+      <label class="toggle on" id="healToggle"><input type="checkbox" id="healChk" checked> Controller running (self-heal)</label>
+    </div>
+
+    <h3>Actual pods (the cluster right now)</h3>
+    <div class="podfield" id="field"></div>
+
+    <div class="grid two" style="margin-top:16px">
+      <div>
+        <h3>Reconciliation log</h3>
+        <div class="rlog" id="rlog"></div>
+      </div>
+      <div>
+        <h3>The loop</h3>
+        <div class="note" id="loopNote" style="font-size:14.5px">
+          <strong>observe → compare → act → repeat.</strong> The controller watches actual pods, compares to your desired count, and creates or deletes pods to close the gap. Forever.
+        </div>
+        <div class="note warn" style="font-size:13.5px">Turn off <strong>“Controller running”</strong> to simulate a broken control plane — now killed pods stay dead. That’s what the controllers protect you from.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Where this self-healing comes from</h2>
+    <div class="grid three">
+      <div class="layer l-purple" style="flex-direction:column;align-items:flex-start;gap:3px"><strong>ReplicaSet controller</strong><small>actual pod count drifted from desired → create/delete pods</small></div>
+      <div class="layer l-purple" style="flex-direction:column;align-items:flex-start;gap:3px"><strong>Node controller</strong><small>node went NotReady → evict its pods so they reschedule</small></div>
+      <div class="layer l-purple" style="flex-direction:column;align-items:flex-start;gap:3px"><strong>Scheduler</strong><small>each replacement pod has no node → gets placed (Viz 03)</small></div>
+    </div>
+    <div class="note">You changed <code>spec.replicas</code>; the system changed <code>status</code>. <strong>You own desired state; Kubernetes owns actual state.</strong> This same loop is also why <strong>GitOps</strong> works — keep desired state in Git and a controller reconciles the cluster to match.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="01-cluster-architecture.html">← Cluster architecture</a>
+    <a class="btn primary" href="03-scheduler.html">Next: The scheduler →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const NODES = ["node-1","node-2","node-3"];
+let pods = [];          // {id, ip, node}
+let seq = 1;
+let desired = 4;
+
+function mkPod(){
+  const oct = 2 + Math.floor(Math.random()*250);
+  return { id: seq++, ip: "10.128."+ (1+Math.floor(Math.random()*2)) +"."+oct, node: NODES[Math.floor(Math.random()*NODES.length)] };
+}
+function log(msg, cls){
+  const l=document.getElementById("rlog");
+  const d=document.createElement("div");
+  d.className=cls||""; d.textContent=msg;
+  l.appendChild(d); l.scrollTop=l.scrollHeight;
+}
+function render(){
+  const f=document.getElementById("field"); f.innerHTML="";
+  pods.forEach(p=>{
+    const el=document.createElement("div");
+    el.className="pod new"; el.dataset.id=p.id;
+    el.innerHTML=`<span>📦 pod-${p.id}</span><span class="ip">${p.ip}</span><span class="node">${p.node}</span>`;
+    f.appendChild(el);
+  });
+  document.getElementById("cDesired").textContent="desired: "+desired;
+  document.getElementById("cActual").textContent="actual: "+pods.length;
+  const c=document.getElementById("cStatus");
+  const inSync = pods.length===desired;
+  c.textContent = inSync ? "in sync ✓" : (pods.length<desired? "reconciling… ↑" : "reconciling… ↓");
+  ["cDesired","cActual"].forEach(id=>{
+    document.getElementById(id).className = "counter " + (inSync?"match":"mismatch");
+  });
+  c.className = "counter " + (inSync?"match":"mismatch");
+}
+
+// the reconciliation loop — runs on a timer
+function reconcile(){
+  if(!document.getElementById("healChk").checked) return;
+  if(pods.length < desired){
+    const p=mkPod(); pods.push(p);
+    log(`[replicaset-controller] actual ${pods.length-1} < desired ${desired} → create pod-${p.id} (scheduled to ${p.node})`, "ctrl");
+    render();
+  } else if(pods.length > desired){
+    const p=pods.pop();
+    log(`[replicaset-controller] actual ${pods.length+1} > desired ${desired} → delete pod-${p.id}`, "ctrl");
+    render();
+  }
+}
+setInterval(reconcile, 900);
+
+function killOne(){
+  if(!pods.length){ log("[you] no pods to kill", "you"); return; }
+  const i=Math.floor(Math.random()*pods.length);
+  const p=pods[i];
+  const el=document.querySelector(`.pod[data-id='${p.id}']`);
+  if(el) el.classList.add("dying");
+  log(`[you] kill pod-${p.id}  💥`, "warn");
+  setTimeout(()=>{ pods=pods.filter(x=>x.id!==p.id); render(); }, 350);
+}
+function crashNode(){
+  const node=NODES[Math.floor(Math.random()*NODES.length)];
+  const victims=pods.filter(p=>p.node===node);
+  if(!victims.length){ log(`[you] crashed ${node} — but it had no pods`, "you"); return; }
+  log(`[you] crash ${node}  🖥️💥`, "warn");
+  log(`[node-controller] ${node} NotReady → evicting ${victims.length} pod(s) for rescheduling`, "ctrl");
+  victims.forEach(p=>{ const el=document.querySelector(`.pod[data-id='${p.id}']`); if(el) el.classList.add("dying"); });
+  setTimeout(()=>{ pods=pods.filter(p=>p.node!==node); render(); }, 350);
+}
+function reset(){
+  pods=[]; seq=1; desired=4;
+  document.getElementById("desired").value=4;
+  document.getElementById("desiredVal").textContent="4";
+  document.getElementById("rlog").innerHTML="";
+  for(let i=0;i<4;i++) pods.push(mkPod());
+  log("[you] kubectl apply -f subscriber-api.yaml  (replicas: 4)", "you");
+  render();
+}
+document.getElementById("desired").addEventListener("input", e=>{
+  desired=+e.target.value;
+  document.getElementById("desiredVal").textContent=desired;
+  log(`[you] kubectl scale deploy/subscriber-api --replicas=${desired}`, "you");
+  render();
+});
+document.getElementById("killOne").addEventListener("click", killOne);
+document.getElementById("crashNode").addEventListener("click", crashNode);
+document.getElementById("reset").addEventListener("click", reset);
+document.getElementById("healChk").addEventListener("change", e=>{
+  document.getElementById("healToggle").classList.toggle("on", e.target.checked);
+  log(e.target.checked ? "[control-plane] controllers resumed — reconciliation active" : "[control-plane] controllers PAUSED — actual state will now drift", e.target.checked?"ok":"warn");
+});
+reset();
+
+renderQuiz("quiz", [
+  { q: "You set desired replicas to 4 and one pod crashes. What happens, and why?",
+    options: [
+      "Nothing — you must manually restart it",
+      "The ReplicaSet controller sees actual(3) < desired(4) and creates a new pod",
+      "The whole Deployment is deleted and recreated",
+      "The scheduler deletes the other three pods to match"],
+    answer: 1,
+    explain: "A controller continuously compares actual to desired. Seeing 3 < 4, the ReplicaSet controller creates one replacement pod. No human action needed — this is self-healing." },
+  { q: "In <code>spec</code> vs <code>status</code>, who owns which?",
+    options: [
+      "You own status; Kubernetes owns spec",
+      "You own spec (desired); Kubernetes owns status (actual)",
+      "Both are written only by the scheduler",
+      "Both are written only by etcd"],
+    answer: 1,
+    explain: "You declare intent in spec (e.g. replicas: 4). Kubernetes continuously reports reality in status. The controllers' whole job is to drive status toward spec." },
+  { q: "When you turned the controller off and killed a pod, it stayed dead. What does that demonstrate?",
+    options: [
+      "Self-healing is a feature of the pods themselves",
+      "Self-healing comes from the control loops in the controller-manager — without them, drift is not corrected",
+      "Pods can never be recovered once killed",
+      "The scheduler replaces pods, not controllers"],
+    answer: 1,
+    explain: "Self-healing isn't magic inside the pod — it's the reconciliation loops (ReplicaSet, node, etc.) in the controller-manager. Stop them and actual state simply drifts from desired." },
+  { q: "Why does this same reconciliation model make GitOps possible?",
+    options: [
+      "Because Git is faster than etcd",
+      "Because desired state is just declarative data — keep it in Git and a controller reconciles the cluster to match it",
+      "Because GitOps replaces the scheduler",
+      "Because pods are stored in Git"],
+    answer: 1,
+    explain: "If desired state is declarative data, you can store it in Git as the single source of truth and have a controller continuously reconcile the live cluster to match the repo. That's GitOps (Module 10)." }
+]);
+</script>
+</body>
+</html>

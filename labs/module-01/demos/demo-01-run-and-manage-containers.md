@@ -34,7 +34,7 @@ We'll use a stock NGINX image to stand in for the API endpoint, then make it
 "telecom" by serving a subscriber record.
 
 ```bash
-podman run -d --name subscriber-api -p 8080:80 \
+podman run -d --name subscriber-api -p 8080:8080 \
   registry.access.redhat.com/ubi9/nginx-120:latest \
   nginx -g "daemon off;"
 ```
@@ -46,8 +46,15 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 ```
 
 > **Narrate:** `-d` = detached (runs in the background); `--name` gives it a
-> friendly handle; `-p 8080:80` publishes container port 80 to host port 8080.
-> The image was pulled once and is now cached.
+> friendly handle; `-p 8080:8080` publishes the container's port to host port
+> 8080. The image was pulled once and is now cached.
+>
+> **Why port 8080, not 80?** Red Hat **UBI / sclorg** images are built to run as
+> a **non-root, arbitrary-UID** user — exactly how OpenShift runs pods. A non-root
+> process can't bind privileged ports (<1024), so this NGINX is configured to
+> listen on **8080**, not 80. Map host→container as `8080:8080`. (This is a
+> preview of the OpenShift security model you'll meet in the RBAC/security
+> modules — and why mapping to container port 80 here would just connection-refuse.)
 
 Verify it's running:
 
@@ -56,8 +63,8 @@ podman ps
 ```
 
 ```
-CONTAINER ID  IMAGE                    ...  STATUS         PORTS                 NAMES
-e3b0c4429...  .../nginx-120:latest     ...  Up 5 seconds   0.0.0.0:8080->80/tcp  subscriber-api
+CONTAINER ID  IMAGE                    ...  STATUS         PORTS                   NAMES
+e3b0c4429...  .../nginx-120:latest     ...  Up 5 seconds   0.0.0.0:8080->8080/tcp  subscriber-api
 ```
 
 ---
@@ -68,16 +75,16 @@ Prove the image→container relationship by launching two more instances on
 different ports (think: scaling the lookup service):
 
 ```bash
-podman run -d --name subscriber-api-2 -p 8081:80 registry.access.redhat.com/ubi9/nginx-120:latest nginx -g "daemon off;"
-podman run -d --name subscriber-api-3 -p 8082:80 registry.access.redhat.com/ubi9/nginx-120:latest nginx -g "daemon off;"
+podman run -d --name subscriber-api-2 -p 8081:8080 registry.access.redhat.com/ubi9/nginx-120:latest nginx -g "daemon off;"
+podman run -d --name subscriber-api-3 -p 8082:8080 registry.access.redhat.com/ubi9/nginx-120:latest nginx -g "daemon off;"
 podman ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 ```
 
 ```
 NAMES              STATUS         PORTS
-subscriber-api     Up 2 minutes   0.0.0.0:8080->80/tcp
-subscriber-api-2   Up 8 seconds   0.0.0.0:8081->80/tcp
-subscriber-api-3   Up 5 seconds   0.0.0.0:8082->80/tcp
+subscriber-api     Up 2 minutes   0.0.0.0:8080->8080/tcp
+subscriber-api-2   Up 8 seconds   0.0.0.0:8081->8080/tcp
+subscriber-api-3   Up 5 seconds   0.0.0.0:8082->8080/tcp
 ```
 
 > **Narrate:** Three independent containers, **one shared image** on disk. This

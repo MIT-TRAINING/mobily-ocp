@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Scheduler — Interactive | Module 2</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .nodes { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  @media (max-width:760px){ .nodes { grid-template-columns:1fr; } }
+  .node {
+    border:2px solid var(--line); border-radius:13px; padding:14px; background:var(--surface);
+    transition:all .25s ease; position:relative;
+  }
+  .node h4 { margin:0 0 6px; font-size:14.5px; display:flex; align-items:center; gap:6px; }
+  .node .labels { display:flex; flex-wrap:wrap; gap:5px; margin:6px 0 10px; }
+  .chip { font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:999px; background:var(--slate-bg); color:var(--slate); }
+  .chip.taint { background:var(--red-bg); color:var(--red-ink); }
+  .node.filtered { opacity:.4; border-color:var(--red); background:var(--red-bg); }
+  .node.feasible { border-color:var(--blue); }
+  .node.winner { border-color:var(--green); box-shadow:var(--shadow-lg); transform:translateY(-3px); }
+  .verdict { font-size:11.5px; font-weight:800; margin-top:8px; padding:4px 8px; border-radius:7px; }
+  .verdict.bad { background:var(--red-bg); color:var(--red-ink); }
+  .verdict.good { background:var(--blue-bg); color:var(--blue-ink); }
+  .verdict.win { background:var(--green-bg); color:var(--green-ink); }
+  .scorebar { height:9px; border-radius:999px; background:var(--slate-bg); overflow:hidden; margin-top:6px; }
+  .scorebar > span { display:block; height:100%; background:var(--green); border-radius:999px; transition:width .5s ease; }
+  .podspec { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 2</a>
+  <span class="pill">Visualization 3 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · kube-scheduler</div>
+    <h1>Where should this pod run?</h1>
+    <p class="lede">A new pod starts with <strong>no node assigned</strong>. The scheduler decides in two phases: <strong>filter</strong> out nodes that can't host it, then <strong>score</strong> the survivors and pick the best. Configure the pod and watch both phases.</p>
+  </div>
+
+  <div class="card">
+    <h2>The pod to schedule — <code>cdr-processor</code></h2>
+    <p class="sub">The operator's CDR (Call Detail Record) processor. Set its requirements; the scheduler re-evaluates instantly.</p>
+
+    <div class="slider-row">
+      <label>CPU request</label>
+      <input type="range" id="cpu" min="1" max="8" value="2">
+      <span class="val" id="cpuVal">2 vCPU</span>
+    </div>
+    <div class="controls">
+      <label class="toggle" id="ssdToggle"><input type="checkbox" id="ssd"> nodeSelector: <code>disk=ssd</code></label>
+      <label class="toggle" id="tolToggle"><input type="checkbox" id="tol"> toleration: <code>gpu=true:NoSchedule</code></label>
+    </div>
+    <div class="note" id="podSummary" style="font-size:14px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Phase 1 &amp; 2 — filter, then score</h2>
+    <p class="sub">Red = filtered out (can't host the pod). Blue = feasible. Green = the winner (highest score).</p>
+    <div class="nodes" id="nodes"></div>
+    <div class="note" id="decision" style="margin-top:16px"></div>
+  </div>
+
+  <div class="card">
+    <h2>What the scheduler weighs</h2>
+    <div class="grid two">
+      <div class="layer l-red" style="flex-direction:column;align-items:flex-start;gap:3px"><strong>Filter (predicates) — can it run here?</strong><small>Enough free CPU/memory · required node labels (nodeSelector/affinity) · taints the pod doesn't tolerate · port conflicts</small></div>
+      <div class="layer l-green" style="flex-direction:column;align-items:flex-start;gap:3px"><strong>Score (priorities) — which feasible node is best?</strong><small>Spread pods of the same app across nodes · prefer more free capacity · image already cached · data locality</small></div>
+    </div>
+    <div class="note">The scheduler only <strong>chooses</strong> — it writes a pod→node <em>binding</em> through the API server. The chosen node's <strong>kubelet</strong> notices via its watch and actually runs the pod (Visualization 04).</div>
+    <div class="note warn"><strong>Taints &amp; tolerations</strong> work in reverse: a taint <em>repels</em> pods from a node unless the pod carries a matching <strong>toleration</strong>. Here, <code>node-3</code> is tainted <code>gpu=true:NoSchedule</code>, so it's filtered out until you add the toleration.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="02-reconciliation-loop.html">← Reconciliation</a>
+    <a class="btn primary" href="04-pod-creation-flow.html">Next: Anatomy of kubectl apply →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// node model: capacity, used, labels, taints
+const NODES = [
+  { id:"node-1", cpuCap:8, cpuUsed:4, ssd:true,  taint:null,    az:"zone-a" },
+  { id:"node-2", cpuCap:8, cpuUsed:1, ssd:false, taint:null,    az:"zone-b" },
+  { id:"node-3", cpuCap:8, cpuUsed:2, ssd:true,  taint:"gpu=true:NoSchedule", az:"zone-a" },
+];
+
+function evaluate(){
+  const cpu=+document.getElementById("cpu").value;
+  const needSsd=document.getElementById("ssd").checked;
+  const tolGpu=document.getElementById("tol").checked;
+
+  document.getElementById("cpuVal").textContent=cpu+" vCPU";
+  document.getElementById("ssdToggle").classList.toggle("on", needSsd);
+  document.getElementById("tolToggle").classList.toggle("on", tolGpu);
+  document.getElementById("podSummary").innerHTML =
+    `<strong>cdr-processor</strong> requests <strong>${cpu} vCPU</strong>` +
+    (needSsd? `, requires <code>disk=ssd</code>`:``) +
+    (tolGpu? `, tolerates <code>gpu=true:NoSchedule</code>`:``) + `.`;
+
+  // evaluate each node
+  const results = NODES.map(n=>{
+    const free = n.cpuCap - n.cpuUsed;
+    const reasons=[];
+    if(free < cpu) reasons.push(`only ${free} vCPU free (needs ${cpu})`);
+    if(needSsd && !n.ssd) reasons.push(`no disk=ssd label`);
+    if(n.taint && !tolGpu) reasons.push(`tainted ${n.taint}, not tolerated`);
+    const feasible = reasons.length===0;
+    // score: prefer more free capacity after placement (bin-spreading), favored slightly
+    const score = feasible ? Math.round(((free - cpu) / n.cpuCap) * 100) : 0;
+    return { n, free, feasible, reasons, score };
+  });
+  const feasibleOnes = results.filter(r=>r.feasible);
+  const winner = feasibleOnes.sort((a,b)=>b.score-a.score)[0];
+
+  const wrap=document.getElementById("nodes"); wrap.innerHTML="";
+  results.forEach(r=>{
+    const isWin = winner && r.n.id===winner.n.id;
+    const div=document.createElement("div");
+    div.className="node " + (!r.feasible? "filtered" : (isWin? "winner":"feasible"));
+    const labelsHtml =
+      `<span class="chip">cpu ${r.n.cpuUsed}/${r.n.cpuCap} used</span>` +
+      (r.n.ssd? `<span class="chip">disk=ssd</span>`:`<span class="chip">disk=hdd</span>`) +
+      `<span class="chip">${r.n.az}</span>` +
+      (r.n.taint? `<span class="chip taint">🚫 ${r.n.taint}</span>`:``);
+    let verdict;
+    if(!r.feasible) verdict=`<div class="verdict bad">✗ filtered: ${r.reasons.join("; ")}</div>`;
+    else if(isWin) verdict=`<div class="verdict win">✓ WINNER · score ${r.score}</div><div class="scorebar"><span style="width:${r.score}%"></span></div>`;
+    else verdict=`<div class="verdict good">feasible · score ${r.score}</div><div class="scorebar"><span style="width:${r.score}%"></span></div>`;
+    div.innerHTML=`<h4>🖥️ ${r.n.id} ${isWin?'🏆':''}</h4><div class="labels">${labelsHtml}</div>${verdict}`;
+    wrap.appendChild(div);
+  });
+
+  const d=document.getElementById("decision");
+  if(!winner){
+    d.className="note warn";
+    d.innerHTML=`<strong>Pending — no feasible node.</strong> Every node was filtered out, so the pod stays <code>Pending</code> until something changes (free capacity, a matching label, or a toleration). This is the #1 reason a pod won't start.`;
+  } else {
+    d.className="note ok";
+    d.innerHTML=`<strong>Scheduled to ${winner.n.id}.</strong> ${feasibleOnes.length} node(s) passed filtering; <strong>${winner.n.id}</strong> scored highest (${winner.score}) — it leaves the most headroom, spreading load. The scheduler writes the binding; ${winner.n.id}'s kubelet takes it from here.`;
+  }
+}
+["cpu","ssd","tol"].forEach(id=>{
+  document.getElementById(id).addEventListener("input", evaluate);
+  document.getElementById(id).addEventListener("change", evaluate);
+});
+evaluate();
+
+renderQuiz("quiz", [
+  { q: "What are the scheduler's two phases, in order?",
+    options: [
+      "Score, then filter",
+      "Filter (which nodes CAN run it), then score (which feasible node is BEST)",
+      "Bind, then evict",
+      "Authenticate, then authorize"],
+    answer: 1,
+    explain: "First the scheduler filters out nodes that cannot host the pod (predicates: resources, labels, taints). Then it scores the survivors (priorities) and picks the highest — finally writing the binding." },
+  { q: "A pod requests 4 vCPU but every node has at most 3 vCPU free. What state is the pod in?",
+    options: ["Running on the least-busy node","CrashLoopBackOff","Pending — no node passes filtering","Terminating"],
+    answer: 2,
+    explain: "If no node survives the filter phase, there's nowhere to place the pod, so it stays Pending until capacity frees up or requirements change. Insufficient resources is the classic 'why won't my pod schedule' cause." },
+  { q: "Node-3 is tainted <code>gpu=true:NoSchedule</code>. How does a pod get scheduled there?",
+    options: [
+      "It can't — taints are permanent blocks",
+      "The pod must carry a matching toleration for that taint",
+      "You must delete the taint for every pod",
+      "Only the scheduler can override it"],
+    answer: 1,
+    explain: "A taint repels pods unless the pod has a matching toleration. Tolerations let specific pods opt in to tainted (e.g. specialized) nodes while keeping everything else off them." },
+  { q: "After the scheduler picks a node, what actually runs the pod there?",
+    options: [
+      "The scheduler SSHes in and starts it",
+      "etcd starts the container",
+      "The chosen node's kubelet sees the binding via its watch and calls the runtime",
+      "kube-proxy launches the container"],
+    answer: 2,
+    explain: "The scheduler only writes a pod→node binding through the API server. The target node's kubelet, watching for pods assigned to it, then drives CRI-O to pull the image and start the container." }
+]);
+</script>
+</body>
+</html>

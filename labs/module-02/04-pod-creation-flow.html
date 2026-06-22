@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anatomy of kubectl apply — Interactive | Module 2</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .actors { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin:6px 0 4px; }
+  @media (max-width:880px){ .actors { grid-template-columns:repeat(4,1fr); } }
+  @media (max-width:520px){ .actors { grid-template-columns:repeat(2,1fr); } }
+  .actor {
+    border:2px solid var(--line); border-radius:11px; padding:10px 8px; text-align:center;
+    font-size:12px; font-weight:750; color:var(--muted); background:var(--surface); transition:all .25s ease;
+  }
+  .actor .emoji { font-size:20px; display:block; margin-bottom:3px; filter:grayscale(.6); opacity:.7; }
+  .actor.live { color:var(--ink); border-color:var(--blue); background:var(--blue-bg); transform:translateY(-3px); box-shadow:var(--shadow); }
+  .actor.live .emoji { filter:none; opacity:1; }
+  .actor.done { border-color:var(--green); color:var(--green-ink); }
+  .actor.api.live { border-color:var(--red); background:var(--red-bg); color:var(--red-ink); }
+  .actor.etcd.live { border-color:var(--amber); background:var(--amber-bg); color:var(--amber-ink); }
+  .progress { height:6px; border-radius:999px; background:var(--slate-bg); overflow:hidden; margin:14px 0; }
+  .progress > span { display:block; height:100%; background:var(--blue); transition:width .4s ease; }
+  .step-card { border:1px solid var(--line); border-radius:12px; padding:16px 18px; background:var(--surface-2); min-height:120px; }
+  .step-card .stepno { font-family:var(--mono); font-weight:800; color:var(--blue); font-size:13px; }
+  .step-card h3 { margin:4px 0 8px; font-size:18px; }
+  .step-card .arrow { font-family:var(--mono); font-size:13px; color:var(--purple); font-weight:700; margin-bottom:8px; }
+  .flowlog { font-family:var(--mono); font-size:12.5px; background:#0f172a; color:#e2e8f0; border-radius:10px; padding:12px; max-height:180px; overflow:auto; margin-top:14px; }
+  .flowlog div { padding:1.5px 0; }
+  .flowlog .hl { color:#7dd3fc; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 2</a>
+  <span class="pill">Visualization 4 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · The pod-creation request flow</div>
+    <h1>What really happens on <code>kubectl apply</code>?</h1>
+    <p class="lede">You type one command. Behind it, six actors cooperate — each reacting to a <strong>watch</strong>, each talking only through the API server, each doing exactly one job. Step through the whole chain.</p>
+  </div>
+
+  <div class="card">
+    <h2>The actors</h2>
+    <div class="actors" id="actors">
+      <div class="actor" data-a="you"><span class="emoji">🧑‍💻</span>You<br><small>oc/kubectl</small></div>
+      <div class="actor api" data-a="api"><span class="emoji">🚪</span>API server</div>
+      <div class="actor etcd" data-a="etcd"><span class="emoji">🗄️</span>etcd</div>
+      <div class="actor" data-a="cm"><span class="emoji">🔁</span>controllers</div>
+      <div class="actor" data-a="sched"><span class="emoji">🎯</span>scheduler</div>
+      <div class="actor" data-a="kubelet"><span class="emoji">🤖</span>kubelet</div>
+      <div class="actor" data-a="crio"><span class="emoji">📦</span>CRI-O</div>
+    </div>
+
+    <div class="progress"><span id="prog" style="width:0%"></span></div>
+
+    <div class="controls">
+      <button class="btn primary" id="next">Start ▶</button>
+      <button class="btn ghost" id="back" disabled>← Back</button>
+      <button class="btn ghost" id="restart">↺ Restart</button>
+      <span class="sub" id="stepCount" style="margin:0">Step 0 / 7</span>
+    </div>
+
+    <div class="step-card" id="stepCard">
+      <div class="stepno">Ready</div>
+      <h3>You're about to create a Deployment</h3>
+      <div class="arrow">subscriber-api · replicas: 3</div>
+      <p style="margin:0;color:var(--ink-soft)">Press <strong>Start</strong> to submit <code>kubectl apply -f subscriber-api.yaml</code> and trace the request end to end. Notice every arrow passes through the API server — never directly between components.</p>
+    </div>
+
+    <div class="flowlog" id="flowlog"></div>
+  </div>
+
+  <div class="card">
+    <h2>The one takeaway</h2>
+    <div class="note">No actor skipped a step or talked out of band. <strong>Every arrow went through the API server; etcd recorded each transition; each actor reacted to a watch, not a direct call.</strong> That decoupling is what makes Kubernetes scalable, resilient, and extensible — you can add new controllers without touching the others.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="03-scheduler.html">← The scheduler</a>
+    <a class="btn primary" href="05-services-discovery.html">Next: Services &amp; DNS →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const STEPS = [
+  { no:"Step 1", live:["you","api"], done:[],
+    title:"You submit desired state",
+    arrow:"you  →  kube-apiserver",
+    body:"<code>kubectl apply</code> sends the Deployment (desired: 3 replicas) to the API server — the one entry point. Your job ends here: you declared intent.",
+    log:"[you] kubectl apply -f subscriber-api.yaml" },
+  { no:"Step 2", live:["api"], done:["you"],
+    title:"API server: authn → authz → admission",
+    arrow:"kube-apiserver (gatekeeping)",
+    body:"The API server verifies <strong>who you are</strong> (authentication), checks <strong>you're allowed</strong> (RBAC authorization), then runs <strong>admission</strong> plugins that can validate, default, or reject. Only valid, permitted requests proceed.",
+    log:"[api] authenticated ✓  authorized (RBAC) ✓  admission ✓" },
+  { no:"Step 3", live:["api","etcd"], done:["you"],
+    title:"Persist to etcd",
+    arrow:"kube-apiserver  →  etcd",
+    body:"The validated Deployment object is written to <strong>etcd</strong>, the single source of truth. The API server replies <code>201 Created</code>. Nothing is running yet — only the <em>intent</em> is recorded.",
+    log:"[api→etcd] persisted Deployment/subscriber-api   →  201 Created" },
+  { no:"Step 4", live:["cm","api","etcd"], done:["you"],
+    title:"Controllers create the downstream objects",
+    arrow:"controller-manager  →  api  →  etcd",
+    body:"The <strong>Deployment controller</strong> (watching) creates a <strong>ReplicaSet</strong>; the ReplicaSet controller creates <strong>3 Pod objects</strong> — all still <em>unscheduled</em> (no node yet). Each write goes through the API server into etcd.",
+    log:"[deployment-ctrl] created ReplicaSet → [replicaset-ctrl] created 3 Pods (Pending, nodeName='')" },
+  { no:"Step 5", live:["sched","api","etcd"], done:["you","cm"],
+    title:"Scheduler binds pods to nodes",
+    arrow:"scheduler  →  api  →  etcd",
+    body:"The <strong>scheduler</strong> (watching for pods with no node) filters &amp; scores nodes and writes a <strong>binding</strong> for each pod. It only chooses — it doesn't run anything.",
+    log:"[scheduler] bound pod-1→node-2, pod-2→node-1, pod-3→node-3" },
+  { no:"Step 6", live:["kubelet","crio"], done:["you","cm","sched"],
+    title:"kubelet runs the containers via CRI-O",
+    arrow:"kubelet  →  CRI-O (via CRI)",
+    body:"Each target node's <strong>kubelet</strong> (watching for pods assigned to it) calls <strong>CRI-O</strong> through the CRI to pull the image and start the container. The control plane never touched the node directly.",
+    log:"[kubelet@node-2] CRI: pull image → create → start container ✓" },
+  { no:"Step 7", live:["kubelet","api","etcd"], done:["you","cm","sched","crio"],
+    title:"Status reported back — actual = desired",
+    arrow:"kubelet  →  api  →  etcd",
+    body:"The kubelet reports <code>status: Running</code> back through the API server into etcd. <code>kubectl get pods</code> now shows 3/3 Running. The endpoints controller wires the pods into their Service (Viz 05). <strong>Reconciliation complete.</strong>",
+    log:"[kubelet] status=Running  →  kubectl get pods: 3/3 Running ✓" },
+];
+let i = 0; // 0 = not started; 1..7 = step index
+
+function paintActors(){
+  const s = i>0 ? STEPS[i-1] : null;
+  document.querySelectorAll(".actor").forEach(a=>{
+    a.classList.remove("live","done");
+    if(!s) return;
+    if(s.live.includes(a.dataset.a)) a.classList.add("live");
+    else if(s.done.includes(a.dataset.a)) a.classList.add("done");
+  });
+}
+function render(){
+  paintActors();
+  document.getElementById("prog").style.width = (i/STEPS.length*100)+"%";
+  document.getElementById("stepCount").textContent = `Step ${i} / ${STEPS.length}`;
+  document.getElementById("back").disabled = i===0;
+  const nextBtn=document.getElementById("next");
+  nextBtn.textContent = i===0 ? "Start ▶" : (i>=STEPS.length ? "Done ✓" : "Next step →");
+  nextBtn.disabled = i>=STEPS.length;
+  if(i>0){
+    const s=STEPS[i-1];
+    document.getElementById("stepCard").innerHTML =
+      `<div class="stepno">${s.no} of ${STEPS.length}</div><h3>${s.title}</h3>`+
+      `<div class="arrow">${s.arrow}</div><p style="margin:0;color:var(--ink-soft)">${s.body}</p>`;
+  }
+}
+function logLine(text){
+  const l=document.getElementById("flowlog");
+  const d=document.createElement("div"); d.innerHTML=text; l.appendChild(d); l.scrollTop=l.scrollHeight;
+}
+document.getElementById("next").addEventListener("click", ()=>{
+  if(i>=STEPS.length) return;
+  i++; render(); logLine(STEPS[i-1].log);
+});
+document.getElementById("back").addEventListener("click", ()=>{
+  if(i===0) return;
+  i--;
+  // rebuild log to current point
+  const l=document.getElementById("flowlog"); l.innerHTML="";
+  for(let k=0;k<i;k++) logLine(STEPS[k].log);
+  render();
+});
+document.getElementById("restart").addEventListener("click", ()=>{
+  i=0; document.getElementById("flowlog").innerHTML="";
+  document.getElementById("stepCard").innerHTML =
+    `<div class="stepno">Ready</div><h3>You're about to create a Deployment</h3>`+
+    `<div class="arrow">subscriber-api · replicas: 3</div>`+
+    `<p style="margin:0;color:var(--ink-soft)">Press <strong>Start</strong> to submit <code>kubectl apply -f subscriber-api.yaml</code> and trace the request end to end. Notice every arrow passes through the API server — never directly between components.</p>`;
+  render();
+});
+render();
+
+renderQuiz("quiz", [
+  { q: "Immediately after <code>kubectl apply</code> succeeds (201 Created), what is true?",
+    options: [
+      "The containers are already running on a node",
+      "Only the desired state is recorded in etcd — nothing is running yet",
+      "The scheduler has already started the pods",
+      "The pods are removed"],
+    answer: 1,
+    explain: "Creating an object just records intent in etcd via the API server. The controllers, scheduler, and kubelet then act asynchronously (by watching) to make reality match. Persisting ≠ running." },
+  { q: "Who decides which node each pod runs on, and who actually starts the container?",
+    options: [
+      "The API server decides and starts it",
+      "The scheduler decides (binding); the node's kubelet starts it via CRI-O",
+      "etcd decides and the scheduler starts it",
+      "The kubelet decides and the scheduler starts it"],
+    answer: 1,
+    explain: "The scheduler chooses a node and writes a binding. The chosen node's kubelet, watching for its assigned pods, then calls CRI-O through the CRI to pull and run the container." },
+  { q: "How do the controllers, scheduler, and kubelet learn there's work to do?",
+    options: [
+      "They poll etcd directly every second",
+      "They each watch the API server and react to changes",
+      "The API server SSHes into each one",
+      "They share memory with etcd"],
+    answer: 1,
+    explain: "Each component watches the API server for the objects it cares about and reacts to changes. This event-driven, decoupled design — all through one front door — is what makes the system scale and stay extensible." },
+  { q: "What single architectural rule does the whole flow illustrate?",
+    options: [
+      "Components talk directly to each other for speed",
+      "Every interaction goes through the API server; no component edits etcd or peers directly",
+      "etcd issues commands to the kubelet",
+      "The scheduler owns the cluster state"],
+    answer: 1,
+    explain: "Every arrow in the flow passes through the kube-apiserver, and etcd records each transition. No component shortcuts to etcd or another component — that decoupling is the core of the architecture." }
+]);
+</script>
+</body>
+</html>
