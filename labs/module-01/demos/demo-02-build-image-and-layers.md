@@ -128,7 +128,7 @@ ID            CREATED         CREATED BY                                SIZE
 Change **only the app code** (add a plan), then rebuild:
 
 ```bash
-sed -i '' 's/"data_gb": 100/"data_gb": 150/' app.py
+sed -i 's/"data_gb": 100/"data_gb": 150/' app.py
 podman build -t tariff-catalog:1.1 .
 ```
 
