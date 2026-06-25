@@ -21,7 +21,9 @@
 3. Without creating anything, show the **top-level fields** of a `Service` object,
    then drill into the documentation for `service.spec.selector`.
 4. List the **objects in your current namespace** (there should be few or none yet).
-5. Using `-o jsonpath`, print **just the server version** of the cluster.
+5. Print **just the server version** of the cluster. Note `kubectl version` only
+   supports `-o json`/`-o yaml` (not `-o jsonpath`); for `-o jsonpath` practice,
+   read the version off a node (`.status.nodeInfo.kubeletVersion`).
 6. List the **control-plane components** running as pods in the `kube-system`
    namespace, and identify the API server, etcd, scheduler, and controller-manager.
 7. Stream **events** in your namespace for ~10 seconds (then stop). Note: it's quiet
@@ -91,7 +93,10 @@ kubectl explain service.spec.selector
 kubectl get all                       # or: kubectl get pods,svc,deploy
 
 # 5. Just the server version
-kubectl version -o jsonpath='{.serverVersion.gitVersion}{"\n"}'
+#    kubectl version supports only json/yaml output:
+kubectl version -o json | grep -m1 gitVersion
+#    for -o jsonpath practice, read it off a node instead:
+kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.kubeletVersion}{"\n"}'
 
 # 6. Control-plane components as pods
 kubectl get pods -n kube-system
@@ -108,3 +113,10 @@ the `apiVersion/kind/metadata/spec/status` shape every object shares — read it
 before writing manifests. Every command you ran was an authenticated HTTPS call to
 that one front door; the control plane itself runs as pods in `kube-system`.
 </details>
+
+---
+
+> **✅ Verified:** kubectl 1.34 · Kubernetes 1.33 (3-node kind, equivalent plain
+> Kubernetes). All recon commands run live. **Fixed:** `kubectl version` rejects
+> `-o jsonpath` on current kubectl (json/yaml only) — use `-o json | grep` or read
+> the version off a node. Node name `minikube` in comments is the lab env's.

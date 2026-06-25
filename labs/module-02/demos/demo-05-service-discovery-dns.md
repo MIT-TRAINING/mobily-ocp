@@ -68,6 +68,12 @@ subscriber-api   10.244.0.41:8080,10.244.0.12:8080,10.244.0.42:8080
 > that are Ready, and listed exactly those 3 IPs. The Service never enumerated pods
 > itself — it declared *intent* (a selector) and the controller filled in reality.
 
+> **k8s 1.33+ note:** `kubectl get endpoints` still works but prints
+> `Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice`.
+> The forward-looking command is
+> `kubectl get endpointslices -l kubernetes.io/service-name=subscriber-api`. Older
+> clusters (e.g. minikube on 1.31) show no warning.
+
 ---
 
 ## Step 3 — Resolve and call the Service by DNS name
@@ -84,8 +90,8 @@ kubectl run tmp-client --rm -it --restart=Never \
 
 ```
 subscriber-api.mod2-demos.svc.cluster.local  10.96.42.10
-200 via 10.96.42.10
-200 via 10.96.42.10
+403 via 10.96.42.10
+403 via 10.96.42.10
 ...
 ```
 
@@ -94,6 +100,16 @@ subscriber-api.mod2-demos.svc.cluster.local  10.96.42.10
 > connects to that one virtual IP, and **kube-proxy** node rules DNAT-balance each
 > connection to one of the 3 backing pods. The caller used a *name* — no pod IP in
 > sight.
+>
+> **Why `403`, not `200`?** The stock `httpd-24` image serves on 8080 but has **no
+> index page**, so `GET /` returns `403 Forbidden` — that's fine here: a 403 *from a
+> pod* proves the name resolved and the connection reached a live backend through
+> the Service. (If you'd rather see `200`, deploy a backend that serves a page, or
+> `curl http://subscriber-api:8080/` against a pod that has content.) Note the
+> `via` address is the **ClusterIP** (the stable virtual IP), the same on every
+> call — the per-pod load-balancing happens transparently behind it (kube-proxy),
+> so it isn't visible in `remote_ip`. To *see* the spread, tail each pod's access
+> log (`kubectl logs`) while curling repeatedly.
 
 ---
 
@@ -169,3 +185,11 @@ kubectl get all -l app=subscriber-api      # confirm clean
 3. What does `subscriber-api.mod2-demos.svc.cluster.local` resolve to, and what
    load-balances from there to a pod?
 4. Why is hard-coding a pod IP in the portal a bug waiting to happen?
+
+---
+
+> **✅ Verified:** kubectl 1.34 · Kubernetes 1.33 (3-node kind, equivalent plain
+> Kubernetes) · images `ubi9/httpd-24`, `ubi9/ubi`. Service/ClusterIP, selector +
+> endpoints, DNS resolution (name → ClusterIP, FQDN), endpoint tracking on
+> scale 3→5→2, and the relabel-out-of-selector behaviour were all run live. The
+> curl returns **403** (httpd has no index page) — corrected above.

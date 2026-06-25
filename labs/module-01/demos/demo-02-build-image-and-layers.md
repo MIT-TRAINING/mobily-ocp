@@ -196,3 +196,9 @@ podman rmi tariff-catalog:1.0 tariff-catalog:1.1   # keep base image cached
    layer are stored?
 3. What's the difference between `tariff-catalog:1.0` and `tariff-catalog:1.1` at
    the layer level?
+
+---
+
+> **✅ Verified:** podman 5.8.2 · 2026-06-25 · base `ubi9/python-311:latest`.
+> Build, layer cache (`--> Using cache`), and `/tariffs` output above are from a
+> real run.

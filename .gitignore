@@ -20,6 +20,12 @@ id_rsa
 id_ed25519
 labs/setup/*.pem
 
+# Lab fleet credentials (per-user passwords / URL mappings — never commit)
+*credentials*.csv
+*.local.csv
+labs/setup/fleet-*.csv
+*.secrets
+
 # Python
 __pycache__/
 *.py[cod]

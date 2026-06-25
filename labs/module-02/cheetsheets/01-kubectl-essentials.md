@@ -123,7 +123,7 @@ kubectl scale deployment subscriber-api --replicas=6     # evening peak
 | `kubectl exec <pod> -- <cmd>` | Run a command in a pod |
 | `kubectl exec -it <pod> -- sh` | Interactive shell. *OpenShift: `oc rsh <pod>`* |
 | `kubectl port-forward <pod> 8080:8080` | Tunnel a pod port to localhost |
-| `kubectl get pod <p> -o jsonpath='{.status.conditions[*].type}'` | Birth milestones: PodScheduled→Initialized→ContainersReady→Ready |
+| `kubectl get pod <p> -o jsonpath='{.status.conditions[*].type}'` | Birth milestones: PodScheduled→Initialized→ContainersReady→Ready (k8s ≥1.31 also lists `PodReadyToStartContainers`; emitted order varies) |
 
 ---
 
@@ -135,7 +135,11 @@ kubectl scale deployment subscriber-api --replicas=6     # evening peak
 | `kubectl get svc <n>` | Show the Service + its stable ClusterIP |
 | `kubectl get svc <n> -o jsonpath='{.spec.selector}'` | The Service's selector |
 | `kubectl get endpoints <n>` | Live pod IPs behind the Service (match **+** Ready) |
-| `kubectl get endpointslices -l kubernetes.io/service-name=<n>` | Newer endpoint representation |
+| `kubectl get endpointslices -l kubernetes.io/service-name=<n>` | Newer endpoint representation (**preferred on k8s 1.33+**) |
+
+> **k8s 1.33+ note:** `kubectl get endpoints` still works but prints
+> `Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice`.
+> Prefer `kubectl get endpointslices -l kubernetes.io/service-name=<n>`.
 
 **DNS resolution from inside the cluster** (a throwaway client pod):
 ```bash

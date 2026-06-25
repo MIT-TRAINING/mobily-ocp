@@ -117,7 +117,9 @@ kubectl get deployment usage-metering \
 
 # 6. One pod's birth milestones
 kubectl get pod -l app=usage-metering \
-  -o jsonpath='{.items[0].status.conditions[*].type}{"\n"}'   # PodScheduled Initialized ContainersReady Ready
+  -o jsonpath='{.items[0].status.conditions[*].type}{"\n"}'
+#   k8s ≥1.31 e.g.: PodReadyToStartContainers Initialized Ready ContainersReady PodScheduled
+#   (set/order vary; the milestones are PodScheduled → Initialized → ContainersReady → Ready)
 
 # Cleanup
 kubectl delete deployment usage-metering
@@ -128,3 +130,10 @@ kubectl delete deployment usage-metering
 of the controllers→scheduler→kubelet chain. The event trail is the audit log of
 that chain.
 </details>
+
+---
+
+> **✅ Verified:** kubectl 1.34 · Kubernetes 1.33 (3-node kind, equivalent plain
+> Kubernetes) · image `ubi9/httpd-24`. Event chain, multi-node spread, and the
+> spec→status jsonpath all run live. Pod-conditions output updated for k8s ≥1.31
+> (adds `PodReadyToStartContainers`; order varies).

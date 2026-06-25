@@ -195,3 +195,10 @@ kubectl get pods -l app=subscriber-api      # all gone
 2. Why can't you permanently reduce a Deployment's pods by deleting them?
 3. Which two numbers must a controller reconcile, and who owns each?
 4. When a node fails, which controller acts, and where do its pods end up?
+
+---
+
+> **✅ Verified:** kubectl 1.34 · Kubernetes 1.33 (3-node kind, equivalent plain
+> Kubernetes) · image `ubi9/httpd-24`. Create/scale, pod self-heal (3/3), and the
+> multi-node `cordon`+`drain` reschedule were all run live. Node names shown
+> (`minikube`, `minikube-m02`) are the minikube lab's; behaviour is identical.

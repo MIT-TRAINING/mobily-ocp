@@ -109,3 +109,9 @@ kubectl delete deployment sms-gateway
 ReplicaSet controller's whole life is closing that gap. Self-healing = the loop
 noticing `actual ≠ desired` and acting — for pod death *and* node death.
 </details>
+
+---
+
+> **✅ Verified:** kubectl 1.34 · Kubernetes 1.33 (3-node kind, equivalent plain
+> Kubernetes) · image `ubi9/httpd-24`. Declare/scale, pod self-heal, and the
+> multi-node `cordon`+`drain` reschedule were run live (via Demo 2's identical flow).

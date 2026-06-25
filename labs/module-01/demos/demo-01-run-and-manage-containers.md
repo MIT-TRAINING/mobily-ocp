@@ -172,3 +172,8 @@ podman ps -a        # confirm all gone
 2. Where did the `subscriber.json` we wrote actually live, and why is it gone now?
 3. Which command would you use to debug a misbehaving container *without*
    stopping it?
+
+---
+
+> **✅ Verified:** podman 5.8.2 · 2026-06-25 · image `ubi9/nginx-120:latest`
+> (doc-root `/opt/app-root/src`). Every command and output above is from a real run.

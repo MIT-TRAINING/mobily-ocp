@@ -62,10 +62,11 @@ podman ps --format "table {{.Names}}\t{{.Ports}}"
 
 # Req 3 — your API answers
 podman exec selfcare-web curl -s http://selfcare-api:8080/account
-# e.g. {"msisdn":"966500000001","plan":"POST-PRO-200","balance_sar":37.50,"status":"ACTIVE"}
+# e.g. {"balance_sar":37.5,"msisdn":"966500000001","plan":"POST-PRO-200","status":"ACTIVE"}
 
 # Req 4 — front end reachable from the host
-curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8090   # 200
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8090   # 200 with an index.html;
+                                                                 # bare httpd returns 403 (still proves the port is published)
 
 # Req 5 — DB row persists across a rebuild
 podman exec selfcare-db psql -U portal -d portal -c "SELECT msisdn,plan FROM subscribers;"
@@ -78,7 +79,9 @@ podman exec selfcare-db psql -U portal -d portal -c "SELECT msisdn,plan FROM sub
 - Reuse the Flask pattern from Exercise 2 for `selfcare-api`.
 - Containers on `selfcare-net` reach each other by name: the web can curl
   `http://selfcare-api:8080`, the API can connect to `selfcare-db:5432`.
-- For PostgreSQL persistence, mount the volume at `/var/lib/pgsql/data`.
+- For PostgreSQL persistence, mount the volume at `/var/lib/pgsql/data`. Use the
+  freely-pullable `quay.io/sclorg/postgresql-15-c9s:latest` (Red Hat's
+  `registry.redhat.io/rhel9/postgresql-15` works too but needs `podman login`).
 - Test inter-container calls with `podman exec selfcare-web curl ...`.
 
 ---
@@ -143,7 +146,7 @@ podman run -d --name selfcare-db --network selfcare-net \
   -e POSTGRESQL_USER=portal -e POSTGRESQL_PASSWORD=portal-pass \
   -e POSTGRESQL_DATABASE=portal \
   -v selfcare-data:/var/lib/pgsql/data \
-  registry.access.redhat.com/rhel9/postgresql-15:latest
+  quay.io/sclorg/postgresql-15-c9s:latest
 sleep 6
 podman exec selfcare-db psql -U portal -d portal -c \
   "CREATE TABLE subscribers(msisdn text, plan text, status text);"
@@ -153,10 +156,16 @@ podman exec selfcare-db psql -U portal -d portal -c \
 # API (private, no -p)  (Req 3)
 podman run -d --name selfcare-api --network selfcare-net selfcare-api:1.0
 
-# front end (published)  (Req 4)
+# front end (published)  (Req 4) — use the image's DEFAULT command, not httpd -DFOREGROUND
 podman run -d --name selfcare-web --network selfcare-net -p 8090:8080 \
-  registry.access.redhat.com/ubi9/httpd-24:latest httpd -DFOREGROUND
+  registry.access.redhat.com/ubi9/httpd-24:latest
+# give the front end a landing page (httpd returns 403 on an empty doc-root)
+podman exec selfcare-web bash -c 'echo "Self-Care Portal" > /var/www/html/index.html'
 ```
+
+> **Note:** override the httpd command with a bare `httpd -DFOREGROUND` and the
+> container crashes on a missing SSL cert — the image's default `run-httpd`
+> entrypoint generates it. Same gotcha as Exercise 1.
 
 **3. Validate:**
 ```bash
@@ -171,7 +180,7 @@ podman rm -f selfcare-db
 podman run -d --name selfcare-db --network selfcare-net \
   -e POSTGRESQL_USER=portal -e POSTGRESQL_PASSWORD=portal-pass -e POSTGRESQL_DATABASE=portal \
   -v selfcare-data:/var/lib/pgsql/data \
-  registry.access.redhat.com/rhel9/postgresql-15:latest
+  quay.io/sclorg/postgresql-15-c9s:latest
 sleep 6
 podman exec selfcare-db psql -U portal -d portal -c "SELECT msisdn,plan FROM subscribers;"
 # the row is still there → volume persisted the data
@@ -190,3 +199,9 @@ network with name-based DNS, exposed only the front end, and persisted data with
 a volume across a rebuild — the complete Module 1 toolkit, and a direct preview of
 how the same stack is expressed on OpenShift.
 </details>
+
+---
+
+> **✅ Verified:** podman 5.8.2 · 2026-06-25 · images `ubi9/python-311` (built API),
+> `quay.io/sclorg/postgresql-15-c9s`, `ubi9/httpd-24` (default command). Build,
+> name-based inter-container call, and volume persistence above are from a real run.

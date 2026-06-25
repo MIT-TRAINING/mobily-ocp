@@ -140,7 +140,13 @@ kube-proxy-xyz12                   1/1     Running   12m
 Prove the **golden rule** that everything is API-driven — turn on request logging:
 
 ```bash
-kubectl get pods -A -v=6 2>&1 | grep -m1 "GET https"   # see the literal API call kubectl makes
+# kubectl ≥1.31 logs the call as: ... "Response" verb="GET" url="https://..."
+kubectl get pods -A -v=6 2>&1 | grep -m1 'verb="GET"'   # see the literal API call kubectl makes
+# (older kubectl printed it as `GET https://... 200 OK` — then use: grep -m1 "GET https")
+```
+
+```
+I0625 ... round_trippers.go:632] "Response" verb="GET" url="https://127.0.0.1:6443/api/v1/pods?limit=500" status="200 OK" milliseconds=12
 ```
 
 > **Narrate:** Even a plain `kubectl get` is just an authenticated **HTTPS GET to
@@ -182,3 +188,11 @@ kill %1 2>/dev/null   # stop the 'kubectl get events --watch' if still running
 3. If the scheduler crashes, can existing pods keep running? Why or why not?
 4. Where does the cluster's entire state physically live, and what's the one
    component allowed to write there?
+
+---
+
+> **✅ Verified:** kubectl 1.34 against Kubernetes 1.33. Commands verified on an
+> equivalent plain-Kubernetes cluster (3-node kind). Output values that are
+> minikube-specific (node name `minikube`, API URL on port **8443**, IP
+> `192.168.49.2`) are shown for the minikube lab environment; on kind/other
+> clusters the node names and URL differ but the commands and behaviour are identical.

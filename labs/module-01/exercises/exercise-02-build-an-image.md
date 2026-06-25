@@ -132,3 +132,9 @@ layer — the expensive dependency install is reused from cache. Reorder them an
 every code change reinstalls Flask. The base layer is stored **once** and shared
 by all images built `FROM` it.
 </details>
+
+---
+
+> **✅ Verified:** podman 5.8.2 · 2026-06-25 · base `ubi9/python-311:latest`.
+> Build, `--> Using cache` on the pip layer, and `/health` + `/metrics` responses
+> above are from a real run.

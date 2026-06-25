@@ -127,6 +127,9 @@ kubectl describe pod <p> | sed -n '/Events:/,$p'     # read the reason
 | `kubectl describe svc <n>` | Selector, ports, and Endpoints in one view |
 | `kubectl exec <pod> -- getent hosts <svc>` | Resolve a Service name → ClusterIP via CoreDNS |
 
+> **k8s 1.33+ note:** `kubectl get endpoints` prints a deprecation warning (still
+> works); prefer `kubectl get endpointslices -l kubernetes.io/service-name=<n>`.
+
 **No endpoints? (Service returns 503 / connection refused):**
 ```bash
 kubectl get endpoints <svc>                 # empty list = nowhere to route

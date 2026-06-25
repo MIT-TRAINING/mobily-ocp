@@ -141,3 +141,10 @@ node — but for different reasons: `cdr-greedy` because no node has the *capaci
 *label* (`didn't match selector`). The event always names the cause. The scheduler
 only *chooses*; the node's kubelet starts the container once a binding exists.
 </details>
+
+---
+
+> **✅ Verified:** kubectl 1.34 · Kubernetes 1.33 (3-node kind, equivalent plain
+> Kubernetes) · images `ubi9/ubi`, `ubi9/httpd-24`. `nodeSelector` placement,
+> `Pending`/`FailedScheduling`, and taint→toleration were run live (Demo 3's
+> identical flow). Exact `FailedScheduling` node counts vary by cluster topology.

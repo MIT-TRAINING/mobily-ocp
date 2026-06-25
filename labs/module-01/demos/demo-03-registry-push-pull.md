@@ -21,6 +21,13 @@
 > Either way, never commit that file. `docker inspect --format '{{index
 > .RepoDigests 0}}'` returns the digest the same way.
 
+> **⚠️ Requires a registry login.** Steps 1–6 push to / pull from a real registry,
+> so they need your own **Quay.io** (or Docker Hub) account: run `podman login`
+> first and replace `<your-namespace>` with **your** namespace. The push/pull
+> output blocks below are *representative* (blob digests vary per build) — they are
+> the only outputs in Module 1 not captured from an unauthenticated run. The local
+> `build`/`tag`/`run` mechanics are verified; the registry round-trip is yours to run.
+
 ## Step 0 — Anatomy of an image reference
 
 Put this on screen and dissect it before touching the CLI:
@@ -160,3 +167,9 @@ podman logout quay.io
 1. What are the four parts of `quay.io/<your-namespace>/tariff-catalog:1.1`?
 2. Why would you deploy production workloads by **digest** instead of `:latest`?
 3. During the push, why were some layers skipped?
+
+---
+
+> **◐ Partially verified:** podman 5.8.2 · 2026-06-25. Local `build`/`tag`/`run`
+> mechanics verified; `login`/`push`/`pull` require your own registry account, so
+> their output is representative, not captured.

@@ -147,7 +147,9 @@ Peek at one pod's own status timeline:
 
 ```bash
 kubectl get pod -l app=tariff-catalog -o jsonpath='{.items[0].status.conditions[*].type}{"\n"}'
-# PodScheduled Initialized ContainersReady Ready
+# e.g.: PodReadyToStartContainers Initialized Ready ContainersReady PodScheduled
+# (the set/order vary by version — k8s ≥1.31 adds PodReadyToStartContainers; the
+#  meaningful birth milestones are PodScheduled → Initialized → ContainersReady → Ready)
 ```
 
 > **Narrate:** Even a single pod records the milestones of its own birth:
@@ -173,3 +175,11 @@ kubectl delete deployment tariff-catalog
    workload?
 3. How did the scheduler and kubelet each "find out" there was work to do?
 4. Why did the 3 pods land on different nodes (on a multi-node cluster)?
+
+---
+
+> **✅ Verified:** kubectl 1.34 · Kubernetes 1.33 (3-node kind, equivalent plain
+> Kubernetes) · image `ubi9/httpd-24`. The event chain
+> (`ScalingReplicaSet`→`SuccessfulCreate`→`Scheduled`→`Started`), multi-node spread,
+> the line-continuation jsonpath (`desired=3 available=3`), and pod conditions were
+> all run live. Node names shown are minikube's.

@@ -201,3 +201,14 @@ kubectl label node "$NODE" disktype-                          # trailing '-' rem
    you find the cause?
 3. What's the difference between a `nodeSelector` and a `toleration`?
 4. The scheduler "bound" a pod to a node — did it start the container? Who did?
+
+---
+
+> **✅ Verified:** kubectl 1.34 · Kubernetes 1.33 (3-node kind, equivalent plain
+> Kubernetes) · images `ubi9/ubi`, `ubi9/httpd-24`. `nodeSelector` placement, the
+> `Pending`/`FailedScheduling` (Insufficient cpu/memory) path, and the
+> taint→toleration round-trip were run live; node label/taint were reverted.
+> **Note:** the exact `FailedScheduling` node counts vary by cluster (on a single
+> schedulable-node-per-role kind cluster the control-plane node also shows an
+> untolerated-taint line); the minikube output where all nodes are schedulable
+> reads `0/3 nodes ... 3 Insufficient cpu`.

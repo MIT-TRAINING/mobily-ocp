@@ -16,8 +16,12 @@
 
 1. **Run** a detached container named `mnp-status` from
    `registry.access.redhat.com/ubi9/httpd-24:latest`, publishing host port
-   **8080** to container port **8080**, with the command `httpd -DFOREGROUND`.
+   **8080** to container port **8080**. Use the **image's default command** — do
+   **not** add `httpd -DFOREGROUND`.
    > Hint: the httpd-24 image serves files from `/var/www/html` on port 8080.
+   > Its default entrypoint (`run-httpd`) generates the TLS cert and starts Apache
+   > for you. Overriding it with a bare `httpd -DFOREGROUND` skips that setup and
+   > the container crashes on a missing SSL certificate.
 
 2. **Verify** it is running and note its `STATUS` and `PORTS`.
 
@@ -84,9 +88,9 @@ podman ps -a | grep mnp-status || echo "Removed — and so is its writable layer
 <summary><strong>✅ Solution</strong> (try the tasks first)</summary>
 
 ```bash
-# 1. Run
+# 1. Run (use the image's default command — NOT httpd -DFOREGROUND)
 podman run -d --name mnp-status -p 8080:8080 \
-  registry.access.redhat.com/ubi9/httpd-24:latest httpd -DFOREGROUND
+  registry.access.redhat.com/ubi9/httpd-24:latest
 
 # 2. Verify
 podman ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
@@ -114,7 +118,7 @@ podman rm -f mnp-status
 
 # Stretch
 podman run -d --name mnp-status-2 -p 8081:8080 \
-  registry.access.redhat.com/ubi9/httpd-24:latest httpd -DFOREGROUND
+  registry.access.redhat.com/ubi9/httpd-24:latest
 podman images   # one image, shared by both containers
 podman logs mnp-status-2
 podman rm -f mnp-status-2
@@ -123,3 +127,9 @@ podman rm -f mnp-status-2
 **Key point:** one image → many containers; the writable layer is per-container
 and is destroyed by `rm`. Durable data needs a volume (Exercise 4).
 </details>
+
+---
+
+> **✅ Verified:** podman 5.8.2 · 2026-06-25 · image `ubi9/httpd-24:latest`
+> (default command; doc-root `/var/www/html`). The run/exec/curl/lifecycle flow
+> above is from a real run.

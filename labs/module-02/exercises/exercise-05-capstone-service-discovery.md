@@ -101,6 +101,10 @@ kubectl run tmp --rm -it --restart=Never \
   --image=registry.access.redhat.com/ubi9/ubi -- bash -c '
   getent hosts subscriber-api;
   for i in 1 2 3 4; do curl -s -o /dev/null -w "%{http_code}\n" http://subscriber-api:8080/; done'
+#   getent prints: <ClusterIP>  subscriber-api.<ns>.svc.cluster.local
+#   curl prints 403 each line — stock httpd-24 has no index page; a 403 still proves
+#   the NAME resolved and reached a backing pod through the Service. (The win is
+#   discovery-by-name, not the status code.)
 
 # 4. Scale; endpoints follow automatically
 kubectl scale deployment subscriber-api --replicas=5; kubectl get endpoints subscriber-api   # 5 IPs
@@ -132,3 +136,12 @@ eligibility, so the endpoint set self-adjusts through scaling, pod death, and
 relabeling — with zero caller changes. That decoupling is what makes a dynamic,
 self-healing cluster usable. Never hard-code a pod IP.
 </details>
+
+---
+
+> **✅ Verified:** kubectl 1.34 · Kubernetes 1.33 (3-node kind, equivalent plain
+> Kubernetes) · images `ubi9/httpd-24`, `ubi9/ubi`. Service+endpoints, DNS-by-name,
+> endpoint tracking on scale, and relabel-out-of-selector were run live. The curl
+> returns **403** (httpd has no index) — expected; the point is name resolution.
+> On k8s 1.33+ `kubectl get endpoints` warns it's deprecated (use
+> `kubectl get endpointslices -l kubernetes.io/service-name=subscriber-api`); still works.

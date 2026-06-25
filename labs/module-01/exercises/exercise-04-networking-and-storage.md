@@ -43,7 +43,7 @@
 # Part A — name resolves on the network
 podman run --rm --network metering-net registry.access.redhat.com/ubi9/ubi:latest \
   getent hosts usage-cache
-# -> <ip>   usage-cache
+# -> 10.89.0.2   usage-cache.dns.podman
 
 # Part B (after the volume-backed rebuild) — counter persists
 podman exec usage-cache redis-cli GET usage:966500000003
@@ -117,3 +117,9 @@ podman network rm metering-net
 ephemeral; a **volume** has an independent lifecycle, so data survives container
 replacement — the seed of OpenShift Persistent Volumes.
 </details>
+
+---
+
+> **✅ Verified:** podman 5.8.2 · 2026-06-25 · image `docker.io/library/redis:7`,
+> probe `ubi9/ubi:latest`. DNS-by-name, ephemeral loss, and volume persistence
+> above are from a real run.

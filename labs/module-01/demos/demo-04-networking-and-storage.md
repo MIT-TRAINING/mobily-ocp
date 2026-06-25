@@ -39,8 +39,13 @@ podman network ls | grep cdr-net
 podman run -d --name cdr-db --network cdr-net \
   -e POSTGRESQL_USER=cdr -e POSTGRESQL_PASSWORD=cdr-pass \
   -e POSTGRESQL_DATABASE=cdr \
-  registry.access.redhat.com/rhel9/postgresql-15:latest
+  quay.io/sclorg/postgresql-15-c9s:latest
 ```
+
+> **Image note:** we use the freely-pullable **sclorg** PostgreSQL image
+> (`quay.io/sclorg/postgresql-15-c9s`). Red Hat's `registry.redhat.io/rhel9/postgresql-15`
+> behaves identically but requires `podman login registry.redhat.io` (a Red Hat
+> account + terms acceptance) — use it if your lab host is already logged in.
 
 > **Security note:** real credentials never go on the command line like this — in
 > OpenShift they come from **Secrets** (Module 7). Here it's for demonstration.
@@ -54,7 +59,7 @@ podman run -it --rm --network cdr-net \
 ```
 
 ```
-10.89.0.2     cdr-db
+10.89.0.2       cdr-db.dns.podman
 ```
 
 > **Narrate:** The name `cdr-db` resolved automatically — that's the container
@@ -66,6 +71,9 @@ podman run -it --rm --network cdr-net \
 ```bash
 podman run -d --name cdr-api --network cdr-net -p 9090:8080 \
   registry.access.redhat.com/ubi9/nginx-120:latest nginx -g "daemon off;"
+
+# give it a landing page (nginx returns 403 on an empty doc-root)
+podman exec cdr-api bash -c 'echo "CDR Ingest API" > /opt/app-root/src/index.html'
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:9090
 ```
 
@@ -103,7 +111,7 @@ Now **destroy the container** and recreate it:
 podman rm -f cdr-db
 podman run -d --name cdr-db --network cdr-net \
   -e POSTGRESQL_USER=cdr -e POSTGRESQL_PASSWORD=cdr-pass -e POSTGRESQL_DATABASE=cdr \
-  registry.access.redhat.com/rhel9/postgresql-15:latest
+  quay.io/sclorg/postgresql-15-c9s:latest
 sleep 5
 podman exec cdr-db bash -c "psql -U cdr -d cdr -c 'SELECT * FROM cdr;'"
 ```
@@ -126,7 +134,7 @@ podman volume create cdr-data
 podman run -d --name cdr-db --network cdr-net \
   -e POSTGRESQL_USER=cdr -e POSTGRESQL_PASSWORD=cdr-pass -e POSTGRESQL_DATABASE=cdr \
   -v cdr-data:/var/lib/pgsql/data \
-  registry.access.redhat.com/rhel9/postgresql-15:latest
+  quay.io/sclorg/postgresql-15-c9s:latest
 sleep 5
 
 # write the record again
@@ -143,7 +151,7 @@ podman rm -f cdr-db
 podman run -d --name cdr-db --network cdr-net \
   -e POSTGRESQL_USER=cdr -e POSTGRESQL_PASSWORD=cdr-pass -e POSTGRESQL_DATABASE=cdr \
   -v cdr-data:/var/lib/pgsql/data \
-  registry.access.redhat.com/rhel9/postgresql-15:latest
+  quay.io/sclorg/postgresql-15-c9s:latest
 sleep 5
 podman exec cdr-db bash -c "psql -U cdr -d cdr -c 'SELECT * FROM cdr;'"
 ```
@@ -176,3 +184,9 @@ podman network rm cdr-net
 2. Why was `cdr-db` *not* given a `-p` published port?
 3. Two containers were destroyed and recreated — why did data survive the second
    time but not the first?
+
+---
+
+> **✅ Verified:** podman 5.8.2 · 2026-06-25 · images
+> `quay.io/sclorg/postgresql-15-c9s:latest`, `ubi9/nginx-120:latest`,
+> `ubi9/ubi:latest`. Every command and output above is from a real run.

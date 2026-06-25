@@ -13,6 +13,10 @@
 
 ---
 
+> **⚠️ Requires a registry login.** This exercise pushes to / pulls from a real
+> registry, so you need your own **Quay.io** (or Docker Hub) account: `podman login`
+> first and replace `<your-namespace>` with **your** namespace.
+
 ## Tasks
 
 1. **Log in** to your registry (`quay.io` or `docker.io`). Use a **token**, not
@@ -106,3 +110,8 @@ The **tag** is mutable; the **digest** (`@sha256:...`) is the immutable content
 hash. Pushing uploads only layers the registry lacks. Pin production to a version
 tag or digest, never bare `:latest`.
 </details>
+
+---
+
+> **◐ Partially verified:** podman 5.8.2 · 2026-06-25. Local `build`/`tag`/`run`
+> mechanics verified; `login`/`push`/`pull` require your own registry account.
