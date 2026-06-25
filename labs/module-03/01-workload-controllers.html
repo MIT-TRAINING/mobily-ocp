@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Choosing a Workload Controller — Interactive | Module 3</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .chooser { display:flex; flex-wrap:wrap; gap:10px; }
+  .wbtn { flex:1 1 180px; text-align:left; }
+  .match-box { margin-top:14px; }
+  .chain { display:flex; flex-direction:column; gap:10px; align-items:center; }
+  .chain .lvl { width:100%; text-align:center; }
+  .chip { display:inline-block; padding:8px 14px; border-radius:10px; font-weight:750; font-size:13px; }
+  .chip.dep { background:var(--blue-bg); color:var(--blue-ink); border:2px solid var(--blue); }
+  .chip.rs  { background:var(--amber-bg); color:var(--amber-ink); border:2px solid var(--amber); }
+  .arrow { color:var(--muted); font-weight:800; }
+  .podfield { display:flex; flex-wrap:wrap; gap:8px; min-height:64px; padding:12px; border:2px dashed var(--line); border-radius:12px; background:var(--surface-2); }
+  .pod { width:66px; height:54px; border-radius:9px; border:2px solid var(--green); background:var(--green-bg);
+    color:var(--green-ink); font-size:10px; font-weight:750; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:2px; transition:all .3s ease; }
+  .pod.dying { border-color:var(--red); background:var(--red-bg); color:var(--red-ink); transform:scale(.85); opacity:.25; }
+  .pod.new { animation:fade .4s ease both; }
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 3</a>
+  <span class="pill">Visualization 1 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Workload controllers</div>
+    <h1>Never run a bare pod. Pick a controller.</h1>
+    <p class="lede">A pod alone is mortal — delete it and it's gone. <strong>Workload controllers</strong> keep your apps alive. The first design decision for any app is <em>which one</em>. Match a scenario below, then watch the <strong>Deployment → ReplicaSet → Pods</strong> chain scale and self-heal.</p>
+  </div>
+
+  <div class="card">
+    <h2>Which controller fits the workload?</h2>
+    <p class="sub">Click a Mobily scenario and see the right controller and why.</p>
+    <div class="chooser">
+      <button class="btn ghost wbtn" data-k="api">📱 <strong>subscriber-api</strong><br><small>many interchangeable stateless copies</small></button>
+      <button class="btn ghost wbtn" data-k="db">🗄️ <strong>CDR store</strong><br><small>clustered DB; stable identity + own disk</small></button>
+      <button class="btn ghost wbtn" data-k="agent">📡 <strong>node log shipper</strong><br><small>one agent on every node</small></button>
+      <button class="btn ghost wbtn" data-k="batch">🧾 <strong>nightly billing rollup</strong><br><small>runs, finishes, stops — on a schedule</small></button>
+    </div>
+    <div class="note match-box" id="matchNote">Pick a scenario above to see the recommended controller.</div>
+  </div>
+
+  <div class="card">
+    <h2>Deployment → ReplicaSet → Pods</h2>
+    <p class="sub">The <code>subscriber-api</code> Deployment owns a ReplicaSet, which owns the Pods. Scale it, then break a pod and watch the ReplicaSet controller heal it.</p>
+
+    <div class="chain">
+      <div class="lvl"><span class="chip dep">Deployment subscriber-api</span></div>
+      <div class="lvl arrow">▼ owns</div>
+      <div class="lvl"><span class="chip rs" id="rsChip">ReplicaSet subscriber-api-59bdf46cb4</span></div>
+      <div class="lvl arrow">▼ owns</div>
+    </div>
+
+    <div class="slider-row" style="margin-top:6px">
+      <label>Desired replicas</label>
+      <input type="range" id="desired" min="0" max="8" value="3">
+      <span class="val" id="desiredVal">3</span>
+    </div>
+    <div class="statebar">
+      <span class="counter" id="cDesired">desired: 3</span>
+      <span class="counter" id="cActual">actual: 3</span>
+      <span class="counter" id="cStatus">in sync ✓</span>
+    </div>
+    <div class="controls" style="margin-top:10px">
+      <button class="btn red" id="killOne">💥 Kill a random pod</button>
+      <button class="btn ghost" id="reset">Reset</button>
+      <label class="toggle on" id="healToggle"><input type="checkbox" id="healChk" checked> ReplicaSet controller running</label>
+    </div>
+
+    <h3>Pods (actual state)</h3>
+    <div class="podfield" id="field"></div>
+    <div class="note">You edit <code>spec.replicas</code>; Kubernetes drives <code>status</code> to match. Turn the controller off and a killed pod stays dead — self-healing <em>is</em> that loop.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="index.html">← All visualizations</a>
+    <a class="btn primary" href="02-rolling-updates.html">Next: Rolling updates &amp; rollbacks →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const MATCH = {
+  api:   { c:"Deployment", cls:"l-blue",  why:"Stateless, interchangeable copies with disposable identities. Default to a Deployment — easy scaling and zero-downtime rolling updates." },
+  db:    { c:"StatefulSet", cls:"l-amber", why:"Each replica needs a stable name (cdr-store-0, -1) and its own PersistentVolume. Only a StatefulSet gives ordered lifecycle + per-pod storage." },
+  agent: { c:"DaemonSet",  cls:"l-purple", why:"One pod per node, automatically. You don't set a replica count — the node count is the count. Perfect for log/metrics agents." },
+  batch: { c:"CronJob (creating Jobs)", cls:"l-green", why:"Work that runs to completion on a schedule. A CronJob spawns a Job at each fire time; the Job's pods run, finish, and stop." }
+};
+document.querySelectorAll(".wbtn").forEach(b=>{
+  b.addEventListener("click",()=>{
+    const m=MATCH[b.dataset.k];
+    document.getElementById("matchNote").innerHTML =
+      `<strong>→ ${m.c}.</strong> ${m.why}`;
+  });
+});
+
+let pods=[], seq=1, desired=3;
+function mkPod(){ const o=2+Math.floor(Math.random()*250); return {id:seq++, ip:"10.244."+(1+Math.floor(Math.random()*2))+"."+o}; }
+function render(){
+  const f=document.getElementById("field"); f.innerHTML="";
+  pods.forEach(p=>{ const e=document.createElement("div"); e.className="pod new"; e.dataset.id=p.id;
+    e.innerHTML=`<span>📦 ...${String(p.id).padStart(2,'0')}</span><span class="ip">${p.ip}</span>`; f.appendChild(e); });
+  document.getElementById("cDesired").textContent="desired: "+desired;
+  document.getElementById("cActual").textContent="actual: "+pods.length;
+  const inSync=pods.length===desired, c=document.getElementById("cStatus");
+  c.textContent=inSync?"in sync ✓":(pods.length<desired?"reconciling… ↑":"reconciling… ↓");
+  ["cDesired","cActual"].forEach(id=>document.getElementById(id).className="counter "+(inSync?"match":"mismatch"));
+  c.className="counter "+(inSync?"match":"mismatch");
+}
+function reconcile(){
+  if(!document.getElementById("healChk").checked) return;
+  if(pods.length<desired){ pods.push(mkPod()); render(); }
+  else if(pods.length>desired){ pods.pop(); render(); }
+}
+setInterval(reconcile,800);
+function killOne(){
+  if(!pods.length) return;
+  const i=Math.floor(Math.random()*pods.length), p=pods[i];
+  const el=document.querySelector(`.pod[data-id='${p.id}']`); if(el) el.classList.add("dying");
+  setTimeout(()=>{ pods=pods.filter(x=>x.id!==p.id); render(); },330);
+}
+function reset(){ pods=[]; seq=1; desired=3;
+  document.getElementById("desired").value=3; document.getElementById("desiredVal").textContent="3";
+  for(let i=0;i<3;i++) pods.push(mkPod()); render(); }
+document.getElementById("desired").addEventListener("input",e=>{ desired=+e.target.value;
+  document.getElementById("desiredVal").textContent=desired; render(); });
+document.getElementById("killOne").addEventListener("click",killOne);
+document.getElementById("reset").addEventListener("click",reset);
+document.getElementById("healChk").addEventListener("change",e=>
+  document.getElementById("healToggle").classList.toggle("on",e.target.checked));
+reset();
+
+renderQuiz("quiz", [
+  { q: "The <code>subscriber-api</code> is a stateless web tier with many interchangeable copies. Which controller?",
+    options: ["StatefulSet","Deployment","DaemonSet","Job"], answer: 1,
+    explain: "Stateless + interchangeable = Deployment. It's the default — easy scaling and rolling updates. Reach for others only when identity, per-node placement, or run-to-completion is required." },
+  { q: "What does a Deployment directly manage?",
+    options: ["Pods, one by one","A ReplicaSet, which manages the Pods","Nodes","Services"], answer: 1,
+    explain: "Deployment → ReplicaSet → Pods. The Deployment manages versions (rollouts) by managing ReplicaSets; the ReplicaSet keeps N pods alive. You rarely create a ReplicaSet directly." },
+  { q: "You set desired=3 and delete one pod with the controller running. What happens?",
+    options: ["Nothing until you recreate it","The ReplicaSet controller sees 2<3 and creates a replacement","The Deployment is deleted","The pod count drops permanently to 2"], answer: 1,
+    explain: "Desired stays 3, actual drops to 2, the ReplicaSet controller closes the gap with a new pod (new name/IP). You can't shrink a Deployment by deleting pods — change the declaration instead." },
+  { q: "Why can't you permanently reduce the pod count by deleting pods?",
+    options: ["Pods are immortal","Because desired state still says N, so the controller recreates them","Deleting pods deletes the ReplicaSet too","The scheduler blocks deletes"], answer: 1,
+    explain: "Reality is reconciled toward desired state. As long as spec.replicas=3, deleting a pod just triggers a replacement. To reduce pods you must change spec (scale)." }
+]);
+</script>
+</body>
+</html>

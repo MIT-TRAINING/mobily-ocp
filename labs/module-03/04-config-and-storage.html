@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Config &amp; Storage — Interactive | Module 3</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .kv { font-family:var(--mono); font-size:12.5px; }
+  .injected { font-family:var(--mono); font-size:12.5px; background:#0f172a; color:#e2e8f0; border-radius:10px; padding:12px; min-height:80px; }
+  .injected .env { color:#7dd3fc; } .injected .file { color:#fcd34d; } .injected .sec { color:#86efac; }
+  .b64row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+  .b64 { font-family:var(--mono); font-size:12px; padding:5px 9px; border-radius:8px; background:var(--slate-bg); }
+  .b64.reveal { background:var(--red-bg); color:var(--red-ink); }
+  .pvc { display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  .disk { width:120px; border-radius:10px; border:2px solid var(--purple); background:var(--purple-bg); color:var(--purple-ink); padding:10px; text-align:center; font-weight:750; font-size:12px; }
+  .disk .data { font-family:var(--mono); font-size:10px; margin-top:6px; min-height:14px; }
+  .podbox { width:120px; border-radius:10px; border:2px solid var(--green); background:var(--green-bg); color:var(--green-ink); padding:10px; text-align:center; font-weight:750; font-size:12px; transition:all .3s ease; }
+  .podbox.gone { border-color:var(--red); background:var(--red-bg); color:var(--red-ink); opacity:.3; transform:scale(.85); }
+  .pvstat { font-family:var(--mono); font-size:12px; padding:5px 10px; border-radius:8px; }
+  .pvstat.pending { background:var(--amber-bg); color:var(--amber-ink); }
+  .pvstat.bound { background:var(--green-bg); color:var(--green-ink); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 3</a>
+  <span class="pill">Visualization 4 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Configuration &amp; storage</div>
+    <h1>Configure without rebuilding. Persist beyond the pod.</h1>
+    <p class="lede">A good image is immutable — the same one runs everywhere. <strong>ConfigMaps</strong> and <strong>Secrets</strong> inject what differs at runtime (but a Secret is only <strong>base64, not encrypted</strong>). A <strong>PVC</strong> gives data a lifecycle independent of any pod, so it survives deletion.</p>
+  </div>
+
+  <div class="card">
+    <h2>Inject config into the tariff-catalog pod</h2>
+    <p class="sub">Pick how the <code>tariff-config</code> ConfigMap is delivered, then inject. The Secret's <code>DB_USER</code> always comes via <code>secretKeyRef</code>.</p>
+    <div class="controls">
+      <label class="toggle on" id="tEnv"><input type="checkbox" id="envChk" checked> envFrom (as env vars)</label>
+      <label class="toggle on" id="tFile"><input type="checkbox" id="fileChk" checked> volume mount (as files)</label>
+      <button class="btn primary" id="inject">Inject into pod</button>
+    </div>
+    <div class="injected" id="inj" style="margin-top:12px">Click <strong>Inject</strong> to see what lands inside the container.</div>
+  </div>
+
+  <div class="card">
+    <h2>Secrets: base64 is not encryption</h2>
+    <p class="sub"><code>DB_PASSWORD</code> stored in the Secret. It <em>looks</em> protected…</p>
+    <div class="b64row">
+      <span class="b64" id="stored">stored: UzNjcjN0LVBhNTU=</span>
+      <button class="btn red" id="decode">base64 -d →</button>
+      <span class="b64" id="decoded" style="visibility:hidden">S3cr3t-Pa55</span>
+    </div>
+    <div class="note warn" style="font-size:13.5px;margin-top:10px">One command reverses it. Real protection = <strong>RBAC</strong> (who can read), <strong>etcd encryption-at-rest</strong>, and keeping Secrets out of Git. (Value shown is a fictional placeholder.)</div>
+  </div>
+
+  <div class="card">
+    <h2>PVC: data outlives the pod</h2>
+    <p class="sub">A <code>WaitForFirstConsumer</code> PVC stays <strong>Pending</strong> until a pod mounts it. Write a CDR, destroy the pod, then mount a new pod on the same claim.</p>
+    <div class="b64row" style="margin-bottom:10px">
+      <span class="pvstat pending" id="pvstat">PVC cdr-archive: Pending</span>
+    </div>
+    <div class="pvc">
+      <div class="podbox" id="podbox">📦 pod<br><small id="podlabel">none</small></div>
+      <span class="arrow" style="font-weight:800;color:var(--muted)">mounts</span>
+      <div class="disk">💾 PV (1Gi)<br><div class="data" id="diskdata">empty</div></div>
+    </div>
+    <div class="controls" style="margin-top:12px">
+      <button class="btn primary" id="writer">1 · Run writer pod (writes CDR)</button>
+      <button class="btn red" id="delpod">2 · Delete the pod</button>
+      <button class="btn green" id="reader">3 · Run new reader pod</button>
+      <button class="btn ghost" id="resetpvc">Reset</button>
+    </div>
+    <div class="note" id="pvcnote" style="font-size:13.5px">The PVC's lifecycle is independent of any pod — that's the whole point. Pods are cattle; the PVC remembers.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="03-services-and-dns.html">← Services &amp; DNS</a>
+    <a class="btn primary" href="05-statefulsets-daemonsets-jobs.html">Next: StatefulSets &amp; Jobs →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// --- config injection ---
+function inject(){
+  const env=document.getElementById("envChk").checked, file=document.getElementById("fileChk").checked;
+  const box=document.getElementById("inj"); let out=[];
+  if(env){ out.push('<span class="env">// env vars (envFrom):</span>');
+    out.push('<span class="env">PLAN_TIER=gold  DATA_QUOTA_GB=50  ROAMING=enabled</span>'); }
+  out.push('<span class="sec">// from Secret (secretKeyRef):</span>');
+  out.push('<span class="sec">DB_USER=mobily_app</span>');
+  if(file){ out.push('<span class="file">// mounted files in /etc/tariff/:</span>');
+    out.push('<span class="file">DATA_QUOTA_GB  PLAN_TIER  ROAMING</span>');
+    out.push('<span class="file">$ cat /etc/tariff/ROAMING → enabled</span>'); }
+  if(!env && !file) out.push('<span class="sec">(only the Secret DB_USER was injected)</span>');
+  box.innerHTML=out.join("<br>");
+}
+document.getElementById("inject").addEventListener("click",inject);
+["envChk","fileChk"].forEach(id=>document.getElementById(id).addEventListener("change",e=>
+  document.getElementById(id==="envChk"?"tEnv":"tFile").classList.toggle("on",e.target.checked)));
+
+// --- secret base64 ---
+document.getElementById("decode").addEventListener("click",()=>{
+  const d=document.getElementById("decoded"); d.style.visibility="visible"; d.classList.add("reveal");
+  document.getElementById("stored").classList.add("reveal");
+});
+
+// --- pvc persistence ---
+let state={written:false, podPresent:false};
+function pvcRender(){
+  document.getElementById("diskdata").textContent = state.written ? "cdr.log: 1 row" : "empty";
+  document.getElementById("podlabel").textContent = state.podPresent ? "running" : "none";
+  document.getElementById("podbox").classList.toggle("gone", !state.podPresent);
+  const s=document.getElementById("pvstat");
+  if(state.everBound){ s.className="pvstat bound"; s.textContent="PVC cdr-archive: Bound"; }
+  else { s.className="pvstat pending"; s.textContent="PVC cdr-archive: Pending"; }
+}
+document.getElementById("writer").addEventListener("click",()=>{
+  state.podPresent=true; state.everBound=true; state.written=true;
+  document.getElementById("pvcnote").innerHTML="Writer mounted the claim → PVC flipped <strong>Pending → Bound</strong>, and one CDR was written to the PV.";
+  pvcRender();
+});
+document.getElementById("delpod").addEventListener("click",()=>{
+  state.podPresent=false;
+  document.getElementById("pvcnote").innerHTML="Pod destroyed. A container's own filesystem would be gone now — but the <strong>PV still holds the data</strong> (it's bound to the PVC, not the pod).";
+  pvcRender();
+});
+document.getElementById("reader").addEventListener("click",()=>{
+  if(!state.everBound){ document.getElementById("pvcnote").textContent="Run the writer first."; return; }
+  state.podPresent=true;
+  document.getElementById("pvcnote").innerHTML="A <strong>brand-new</strong> reader pod mounted the same PVC — and the CDR is still there. <strong>Data survived pod deletion.</strong>";
+  pvcRender();
+});
+document.getElementById("resetpvc").addEventListener("click",()=>{ state={written:false,podPresent:false,everBound:false};
+  document.getElementById("pvcnote").textContent="The PVC's lifecycle is independent of any pod — pods are cattle; the PVC remembers."; pvcRender(); });
+pvcRender();
+
+renderQuiz("quiz", [
+  { q: "Two ways a ConfigMap is delivered into a pod — which pair is correct?",
+    options: ["Only as environment variables","As env vars (envFrom/valueFrom) and as files in a mounted volume","Only as a mounted volume","As a Service and an Ingress"], answer: 1,
+    explain: "Use env vars for simple settings; mount as files when an app reads whole config files (nginx.conf, application.yaml) from disk. The same ConfigMap can do both at once." },
+  { q: "Is a Kubernetes Secret encrypted?",
+    options: ["Yes, AES-256 by default","No — it's only base64-encoded, which is trivially reversible","Yes, with your SSH key","Only NodePort Secrets are"], answer: 1,
+    explain: "Base64 is encoding, not encryption — `base64 -d` reveals it. Protect Secrets with RBAC, etcd encryption-at-rest, and by keeping them out of Git." },
+  { q: "Your PVC sits in Pending. Why, with the default StorageClass?",
+    options: ["It failed","WaitForFirstConsumer delays provisioning until a pod mounts it","You ran out of disk","Secrets are missing"], answer: 1,
+    explain: "WaitForFirstConsumer binding mode waits for a consuming pod so the volume is provisioned on the right node. It flips to Bound the moment a pod mounts it." },
+  { q: "A new reader pod read data a deleted writer pod wrote. What made that possible?",
+    options: ["The container filesystem","The PVC/PV, whose lifecycle is independent of any pod","The ConfigMap","The Service"], answer: 1,
+    explain: "A container's own filesystem is ephemeral. The PVC binds to a PV that persists independently of pods, so data survives pod deletion — the dividing line between stateless and stateful." }
+]);
+</script>
+</body>
+</html>

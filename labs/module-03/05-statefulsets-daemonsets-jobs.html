@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StatefulSets, DaemonSets &amp; Jobs — Interactive | Module 3</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .tabs { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .stage { min-height:120px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start; }
+  .sset { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .ppod { width:90px; border-radius:9px; border:2px solid var(--amber); background:var(--amber-bg); color:var(--amber-ink); padding:8px; text-align:center; font-weight:750; font-size:12px; }
+  .ppod.new { animation:fade .4s ease both; }
+  .pdisk { font-family:var(--mono); font-size:9px; margin-top:4px; color:var(--ink-soft); }
+  .node { width:160px; border-radius:10px; border:2px solid var(--line); background:var(--surface-2); padding:10px; }
+  .node h4 { margin:0 0 6px; font-size:12px; }
+  .node.tainted { border-color:var(--red); background:var(--red-bg); }
+  .dpod { display:inline-block; padding:5px 9px; border-radius:8px; background:var(--purple-bg); color:var(--purple-ink); font-size:11px; font-weight:750; border:2px solid var(--purple); }
+  .jgrid { display:flex; flex-wrap:wrap; gap:8px; }
+  .jpod { width:96px; border-radius:9px; padding:8px; text-align:center; font-size:11px; font-weight:750; border:2px solid var(--slate); background:var(--slate-bg); transition:all .3s ease; }
+  .jpod.running { border-color:var(--blue); background:var(--blue-bg); color:var(--blue-ink); }
+  .jpod.done { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); }
+  .jmeta { font-family:var(--mono); font-size:12.5px; padding:6px 10px; border-radius:8px; background:var(--slate-bg); display:inline-block; margin-top:8px; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 3</a>
+  <span class="pill">Visualization 5 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · The special controllers</div>
+    <h1>When a Deployment isn't the right shape.</h1>
+    <p class="lede">Three controllers cover what a Deployment can't: <strong>StatefulSets</strong> (stable identity + own disk), <strong>DaemonSets</strong> (one pod per node), and <strong>Jobs/CronJobs</strong> (run to completion). Explore each below.</p>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <button class="btn primary" data-t="ss">StatefulSet</button>
+      <button class="btn ghost" data-t="ds">DaemonSet</button>
+      <button class="btn ghost" data-t="job">Job</button>
+    </div>
+
+    <!-- StatefulSet -->
+    <div id="panel-ss">
+      <h2>StatefulSet cdr-store</h2>
+      <p class="sub">Pods are created <strong>in order</strong>, get <strong>stable ordinal names</strong>, and each keeps <strong>its own PVC</strong>. Scale and watch identities stay put.</p>
+      <div class="slider-row"><label>Replicas</label><input type="range" id="ssn" min="0" max="5" value="3"><span class="val" id="ssnv">3</span></div>
+      <div class="row stage" id="ssStage" style="margin-top:12px"></div>
+      <div class="note" id="ssNote" style="font-size:13.5px"><code>cdr-store-0</code> is always <code>-0</code>, bound to <code>data-cdr-store-0</code> forever. Delete &amp; reschedule it and it returns with the same name and the same disk. Pair with a <strong>headless Service</strong> for per-pod DNS <code>cdr-store-0.cdr-store</code>.</div>
+    </div>
+
+    <!-- DaemonSet -->
+    <div id="panel-ds" style="display:none">
+      <h2>DaemonSet node-probe</h2>
+      <p class="sub">One pod per <em>eligible</em> node — you never set a count. Add nodes and watch pods appear. The control-plane is <strong>tainted</strong>, so no probe lands there.</p>
+      <div class="controls">
+        <button class="btn green" id="addNode">+ Add worker node</button>
+        <button class="btn ghost" id="dsReset">Reset</button>
+        <span class="jmeta" id="dsCount">DESIRED: 2 · CURRENT: 2</span>
+      </div>
+      <div class="row stage" id="dsStage" style="margin-top:12px"></div>
+      <div class="note" id="dsNote" style="font-size:13.5px">"One per node" means one per node the pod is <strong>allowed</strong> on. The control-plane carries <code>NoSchedule</code> and our DaemonSet has no toleration — so it stays empty. System DaemonSets (CNI) add tolerations to cover it.</div>
+    </div>
+
+    <!-- Job -->
+    <div id="panel-job" style="display:none">
+      <h2>Job cdr-roundup</h2>
+      <p class="sub"><code>completions: 3, parallelism: 2</code> — run 3 successes, two at a time, then <strong>stop</strong>. Pods stay <code>Completed</code> (not restarted) so you can read logs.</p>
+      <div class="controls"><button class="btn primary" id="runJob">▶ Run the Job</button><button class="btn ghost" id="jobReset">Reset</button></div>
+      <div class="jgrid stage" id="jobStage" style="margin-top:12px"></div>
+      <div class="jmeta" id="jobMeta">STATUS: ready · COMPLETIONS: 0/3</div>
+      <div class="note" id="jobNote" style="font-size:13.5px;margin-top:10px">A Job's <code>restartPolicy</code> is <code>Never</code>/<code>OnFailure</code> — never <code>Always</code>. A <strong>CronJob</strong> just creates a Job like this on a schedule (e.g. <code>0 2 * * *</code> = nightly billing).</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="04-config-and-storage.html">← Config &amp; storage</a>
+    <a class="btn primary" href="index.html">Done — back to all visualizations →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// tab switching
+document.querySelectorAll("[data-t]").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("[data-t]").forEach(x=>{x.classList.remove("primary");x.classList.add("ghost");});
+  b.classList.add("primary"); b.classList.remove("ghost");
+  document.getElementById("panel-ss").style.display = b.dataset.t==="ss"?"block":"none";
+  document.getElementById("panel-ds").style.display = b.dataset.t==="ds"?"block":"none";
+  document.getElementById("panel-job").style.display = b.dataset.t==="job"?"block":"none";
+}));
+
+// --- StatefulSet ---
+function renderSS(n){
+  const s=document.getElementById("ssStage"); s.innerHTML="";
+  for(let i=0;i<n;i++){ const d=document.createElement("div"); d.className="sset";
+    d.innerHTML=`<div class="ppod new">cdr-store-${i}</div><div class="pdisk">💾 data-cdr-store-${i}</div>`; s.appendChild(d); }
+  if(n===0) s.innerHTML='<div class="note">0 replicas — scaled to zero.</div>';
+}
+document.getElementById("ssn").addEventListener("input",e=>{ document.getElementById("ssnv").textContent=e.target.value; renderSS(+e.target.value); });
+renderSS(3);
+
+// --- DaemonSet ---
+let workers=2;
+function renderDS(){
+  const s=document.getElementById("dsStage"); s.innerHTML="";
+  // control-plane (tainted, no pod)
+  const cp=document.createElement("div"); cp.className="node tainted";
+  cp.innerHTML='<h4>control-plane 🛡️</h4><small style="font-family:var(--mono);font-size:10px">NoSchedule taint → no probe</small>';
+  s.appendChild(cp);
+  for(let i=1;i<=workers;i++){ const n=document.createElement("div"); n.className="node";
+    n.innerHTML=`<h4>worker-${i}</h4><span class="dpod">📡 node-probe</span>`; s.appendChild(n); }
+  document.getElementById("dsCount").textContent=`DESIRED: ${workers} · CURRENT: ${workers}`;
+}
+document.getElementById("addNode").addEventListener("click",()=>{ if(workers<5){workers++; renderDS();} });
+document.getElementById("dsReset").addEventListener("click",()=>{ workers=2; renderDS(); });
+renderDS();
+
+// --- Job ---
+let jobBusy=false;
+function jobReset(){ jobBusy=false;
+  const g=document.getElementById("jobStage"); g.innerHTML="";
+  for(let i=0;i<3;i++){ const p=document.createElement("div"); p.className="jpod"; p.id="jp"+i; p.textContent="pending"; g.appendChild(p); }
+  document.getElementById("jobMeta").textContent="STATUS: ready · COMPLETIONS: 0/3";
+}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+async function runJob(){
+  if(jobBusy) return; jobBusy=true; jobReset(); jobBusy=true;
+  // parallelism 2: pods 0,1 run; then 2
+  const order=[[0,1],[2]];
+  let done=0;
+  for(const batch of order){
+    batch.forEach(i=>{ const p=document.getElementById("jp"+i); p.className="jpod running"; p.textContent="Running"; });
+    document.getElementById("jobMeta").textContent=`STATUS: running (parallelism 2) · COMPLETIONS: ${done}/3`;
+    await sleep(900);
+    batch.forEach(i=>{ const p=document.getElementById("jp"+i); p.className="jpod done"; p.textContent="Completed"; done++; });
+    document.getElementById("jobMeta").textContent=`STATUS: running · COMPLETIONS: ${done}/3`;
+    await sleep(300);
+  }
+  document.getElementById("jobMeta").textContent="STATUS: Complete · COMPLETIONS: 3/3 — Job stops.";
+  jobBusy=false;
+}
+document.getElementById("runJob").addEventListener("click",runJob);
+document.getElementById("jobReset").addEventListener("click",jobReset);
+jobReset();
+
+renderQuiz("quiz", [
+  { q: "Two things a StatefulSet gives you that a Deployment cannot?",
+    options: ["Rolling updates and scaling","Stable ordinal names + a per-pod PVC (identity + own storage)","NodePorts and Ingress","More replicas"], answer: 1,
+    explain: "StatefulSets guarantee stable names (cdr-store-0/-1), ordered lifecycle, and one PVC per pod via volumeClaimTemplates. A Deployment's pods are interchangeable with random names and shared/no storage." },
+  { q: "On a 3-node cluster, a DaemonSet shows DESIRED 2. Why not 3?",
+    options: ["A bug","The control-plane node is tainted NoSchedule and the DaemonSet has no toleration","DaemonSets max out at 2","Two nodes are down"], answer: 1,
+    explain: "'One per node' means one per node the pod can tolerate. The control-plane's NoSchedule taint, unmatched by a toleration, excludes it — so only the 2 workers get a pod." },
+  { q: "Why do a Job's pods stay in Completed instead of being restarted?",
+    options: ["A bug keeps them around","A Job runs to completion; restartPolicy is Never/OnFailure, and completed pods are kept so you can read logs","They're actually running","Kubernetes forgot to clean them"], answer: 1,
+    explain: "Jobs run finite work. Once completions are met the Job stops; finished pods remain Completed (not Always-restarted) so their logs are available." },
+  { q: "How does a CronJob relate to a Job?",
+    options: ["It's an unrelated object","It creates a Job on a cron schedule (e.g. 0 2 * * * for nightly billing)","It's a Job that never ends","It replaces Deployments"], answer: 1,
+    explain: "A CronJob is a scheduler: at each cron fire time it creates a fresh Job (and its pods). It's the cluster-native replacement for cron-on-a-VM, with logs and history as first-class objects." }
+]);
+</script>
+</body>
+</html>

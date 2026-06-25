@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Services, Endpoints &amp; DNS — Interactive | Module 3</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .pods { display:flex; flex-wrap:wrap; gap:10px; }
+  .pod { width:140px; border-radius:10px; border:2px solid var(--line); background:var(--surface-2); padding:10px; cursor:pointer; transition:all .25s ease; }
+  .pod.ready { border-color:var(--green); background:var(--green-bg); }
+  .pod.unready { border-color:var(--red); background:var(--red-bg); opacity:.7; }
+  .pod.nomatch { border-style:dashed; opacity:.55; }
+  .pod h4 { margin:0 0 4px; font-size:13px; }
+  .pod .ip { font-family:var(--mono); font-size:11px; color:var(--ink-soft); }
+  .pod .lab { font-family:var(--mono); font-size:10px; margin-top:4px; }
+  .ep { font-family:var(--mono); font-size:12.5px; background:#0f172a; color:#86efac; border-radius:10px; padding:12px; min-height:40px; }
+  .ep.empty { color:#fca5a5; }
+  .svc-tabs { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  .dnsbox { font-family:var(--mono); font-size:12.5px; background:var(--slate-bg); border-radius:10px; padding:12px; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 3</a>
+  <span class="pill">Visualization 3 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Services, endpoints &amp; DNS</div>
+    <h1>Pods come and go. The Service name stays.</h1>
+    <p class="lede">A <strong>Service</strong> is a stable name + virtual IP over a changing set of pods. It finds them by <strong>label selector</strong> and stores the result as an <strong>EndpointSlice</strong> — its live backend list. <strong>CoreDNS</strong> makes it reachable as <code>&lt;svc&gt;.&lt;ns&gt;.svc.cluster.local</code>.</p>
+  </div>
+
+  <div class="card">
+    <h2>Service: subscriber-api &nbsp;<small style="font-weight:500;color:var(--muted)">selector: app=subscriber-api</small></h2>
+    <p class="sub">Click a pod to toggle its <strong>readiness</strong>; click the label to toggle whether it <strong>matches the selector</strong>. Watch the EndpointSlice react.</p>
+    <div class="pods" id="pods"></div>
+
+    <h3 style="margin-top:16px">EndpointSlice (live backends, port 8080)</h3>
+    <div class="ep" id="ep"></div>
+    <div class="note" id="epnote" style="font-size:13.5px">Only pods that <strong>match the selector AND are Ready</strong> become endpoints. An empty slice = the Service has nothing to route to (connection refused) — the #1 "my Service is broken" cause.</div>
+  </div>
+
+  <div class="card">
+    <h2>How clients reach it</h2>
+    <div class="svc-tabs">
+      <button class="btn ghost" data-t="clusterip">ClusterIP</button>
+      <button class="btn ghost" data-t="nodeport">NodePort</button>
+      <button class="btn ghost" data-t="headless">Headless</button>
+      <button class="btn ghost" data-t="ingress">Ingress</button>
+    </div>
+    <div class="dnsbox" id="svcbox"></div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="02-rolling-updates.html">← Rolling updates</a>
+    <a class="btn primary" href="04-config-and-storage.html">Next: Config &amp; storage →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+let pods=[
+  {id:1, ip:"10.244.2.52", ready:true,  match:true},
+  {id:2, ip:"10.244.1.42", ready:true,  match:true},
+  {id:3, ip:"10.244.2.50", ready:true,  match:true}
+];
+function renderPods(){
+  const c=document.getElementById("pods"); c.innerHTML="";
+  pods.forEach(p=>{
+    const e=document.createElement("div");
+    e.className="pod "+(!p.match?"nomatch":(p.ready?"ready":"unready"));
+    e.innerHTML=`<h4>📦 pod-${p.id}</h4><div class="ip">${p.ip}:8080</div>
+      <div class="lab">app=${p.match?'subscriber-api':'other'} <button class="btn ghost" style="padding:2px 6px;font-size:10px" data-lab="${p.id}">toggle label</button></div>`;
+    e.addEventListener("click",ev=>{ if(ev.target.dataset.lab) return; p.ready=!p.ready; render(); });
+    c.appendChild(e);
+  });
+  c.querySelectorAll("[data-lab]").forEach(b=>b.addEventListener("click",ev=>{
+    ev.stopPropagation(); const p=pods.find(x=>x.id==b.dataset.lab); p.match=!p.match; render(); }));
+}
+function renderEp(){
+  const eps=pods.filter(p=>p.match && p.ready);
+  const el=document.getElementById("ep");
+  if(eps.length){ el.className="ep"; el.textContent=eps.map(p=>p.ip+":8080").join("   "); }
+  else { el.className="ep empty"; el.textContent="<no endpoints>  — Service has nothing to route to"; }
+}
+function render(){ renderPods(); renderEp(); }
+
+const SVC={
+  clusterip:`$ kubectl get svc subscriber-api
+NAME             TYPE        CLUSTER-IP     PORT(S)
+subscriber-api   ClusterIP   10.96.48.169   80/TCP
+
+# internal only — reach it by DNS from any pod:
+$ curl http://subscriber-api/            # same namespace (short name)
+$ curl http://subscriber-api.mod3.svc.cluster.local/   # FQDN`,
+  nodeport:`$ kubectl get svc subscriber-api-np
+NAME                TYPE       CLUSTER-IP    PORT(S)
+subscriber-api-np   NodePort   10.96.97.71   80:30294/TCP
+
+# also opens port 30294 on EVERY node:
+$ curl http://<any-node-ip>:30294/       # reachable from outside
+# coarse for prod — high ports don't scale per-service`,
+  headless:`$ kubectl get svc subscriber-api-headless
+NAME                      CLUSTER-IP   PORT(S)
+subscriber-api-headless   None         80/TCP
+
+# CLUSTER-IP None: DNS returns the POD IPs directly,
+# not one virtual IP. Used with StatefulSets so each
+# pod is individually addressable (Viz 05).`,
+  ingress:`$ kubectl get ingress selfcare
+NAME       HOSTS                     ADDRESS   PORTS
+selfcare   selfcare.mobily.example             80
+
+# ADDRESS is EMPTY — the Ingress OBJECT is just rules.
+# Nothing routes until an Ingress CONTROLLER is installed
+# to read them.  Object = rules; Controller = enforcer.
+#   /api      -> subscriber-api:80
+#   /tariffs  -> tariff-catalog:80`
+};
+document.querySelectorAll("[data-t]").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("[data-t]").forEach(x=>x.classList.remove("primary"));
+  b.classList.add("primary");
+  document.getElementById("svcbox").textContent=SVC[b.dataset.t];
+}));
+document.getElementById("svcbox").textContent=SVC.clusterip;
+document.querySelector("[data-t='clusterip']").classList.add("primary");
+render();
+
+renderQuiz("quiz", [
+  { q: "A pod stops being Ready. What happens to it in the Service's EndpointSlice?",
+    options: ["Nothing — it stays an endpoint","It's removed, so traffic stops going to it","The Service is deleted","It becomes a NodePort"], answer: 1,
+    explain: "Only Ready pods matching the selector are endpoints. An unready pod is dropped from the EndpointSlice automatically, so the Service routes only to healthy backends." },
+  { q: "Your Service exists but every request fails with connection refused. First thing to check?",
+    options: ["The node's CPU","Whether the EndpointSlice has any ready endpoints (selector match + readiness)","The cluster version","DNS TTL"], answer: 1,
+    explain: "An empty EndpointSlice means the selector matches no ready pods — usually a label typo or all pods unready. The Service has nothing to route to." },
+  { q: "How does a pod reach a Service in ANOTHER namespace?",
+    options: ["It can't","By FQDN: <svc>.<namespace>.svc.cluster.local","Only by IP","Via NodePort only"], answer: 1,
+    explain: "Short names resolve within your own namespace via the search domain. Across namespaces, use the fully-qualified <svc>.<ns>.svc.cluster.local name." },
+  { q: "You applied an Ingress and its ADDRESS column is blank. What's missing?",
+    options: ["A Service","An Ingress controller to enforce the rules","A NodePort","A PVC"], answer: 1,
+    explain: "An Ingress object is just routing rules. It does nothing until an Ingress controller (e.g. ingress-nginx) is running to read the rules and proxy traffic. OpenShift ships one (the Router) by default." }
+]);
+</script>
+</body>
+</html>

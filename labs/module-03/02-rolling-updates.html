@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rolling Updates &amp; Rollbacks — Interactive | Module 3</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .podfield { display:flex; flex-wrap:wrap; gap:8px; min-height:64px; padding:12px; border:2px dashed var(--line); border-radius:12px; background:var(--surface-2); }
+  .pod { width:78px; height:56px; border-radius:9px; font-size:11px; font-weight:750; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:2px; transition:all .35s ease; }
+  .pod.v1 { background:var(--blue-bg); color:var(--blue-ink); border:2px solid var(--blue); }
+  .pod.v2 { background:var(--green-bg); color:var(--green-ink); border:2px solid var(--green); }
+  .pod.pending { opacity:.4; border-style:dashed; }
+  .pod .tag2 { font-family:var(--mono); font-size:9px; }
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:13px; padding:5px 10px; border-radius:9px; background:var(--slate-bg); }
+  .counter.good { background:var(--green-bg); color:var(--green-ink); }
+  .counter.warn { background:var(--amber-bg); color:var(--amber-ink); }
+  .hist { font-family:var(--mono); font-size:12.5px; background:#0f172a; color:#e2e8f0; border-radius:10px; padding:12px; }
+  .hist div { padding:1.5px 0; } .hist .cur { color:#86efac; }
+  .rollbar { display:flex; gap:8px; align-items:center; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 3</a>
+  <span class="pill">Visualization 2 of 5</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Rolling updates &amp; rollbacks</div>
+    <h1>Ship a new version without dropping a request.</h1>
+    <p class="lede">A Deployment manages <strong>one ReplicaSet per version</strong>, so it can shift replicas old→new gradually — bounded by <strong>maxSurge</strong> and <strong>maxUnavailable</strong> so capacity never dips below your guarantee. And the old ReplicaSet stays parked at zero, which is what makes <strong>rollback</strong> instant.</p>
+  </div>
+
+  <div class="card">
+    <h2>tariff-catalog rollout</h2>
+    <p class="sub">3 replicas of <code>nginx:1.25</code>. Tune the rollout knobs, then push <code>1.26</code> and watch the surge/drain. Roll back any time.</p>
+
+    <div class="grid two">
+      <div class="slider-row"><label>maxSurge</label>
+        <input type="range" id="surge" min="0" max="3" value="1"><span class="val" id="surgeVal">1</span></div>
+      <div class="slider-row"><label>maxUnavailable</label>
+        <input type="range" id="unavail" min="0" max="3" value="1"><span class="val" id="unavailVal">1</span></div>
+    </div>
+
+    <div class="rollbar" style="margin:12px 0">
+      <button class="btn primary" id="rollFwd">⬆ Roll out nginx:1.26</button>
+      <button class="btn amber" id="rollBack">↩ Roll back</button>
+      <button class="btn ghost" id="reset">Reset</button>
+    </div>
+
+    <div class="statebar">
+      <span class="counter" id="cReady">ready: 3/3</span>
+      <span class="counter" id="cVer">serving: 1.25</span>
+      <span class="counter" id="cRev">revision: 1</span>
+    </div>
+
+    <h3>Pods</h3>
+    <div class="podfield" id="field"></div>
+
+    <div class="grid two" style="margin-top:16px">
+      <div>
+        <h3>Revision history</h3>
+        <div class="hist" id="hist"></div>
+      </div>
+      <div>
+        <h3>What you're seeing</h3>
+        <div class="note" id="explain" style="font-size:14px">New (1.26) pods come up <strong>Ready before</strong> old (1.25) pods leave. With maxUnavailable=0 the Deployment must surge first; with maxSurge=0 it must drain first. Ready count stays at/above the guaranteed minimum throughout.</div>
+        <div class="note warn" style="font-size:13px">The old ReplicaSet isn't deleted — it's scaled to 0 and kept. That parked recipe is why <strong>rollback is one command</strong>.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="01-workload-controllers.html">← Workload controllers</a>
+    <a class="btn primary" href="03-services-and-dns.html">Next: Services &amp; DNS →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const TOTAL=3;
+let pods=[];      // {ver:'v1'|'v2', ready:bool}
+let revision=1;
+let history=[];   // {rev, cause}
+let busy=false;
+
+function setHistory(){
+  const h=document.getElementById("hist"); h.innerHTML="";
+  const head=document.createElement("div"); head.textContent="REVISION  CHANGE-CAUSE"; h.appendChild(head);
+  history.forEach(r=>{ const d=document.createElement("div");
+    d.className = r.rev===revision ? "cur":""; d.textContent=`${r.rev}         ${r.cause}`; h.appendChild(d); });
+}
+function curVer(){ return pods.some(p=>p.ver==='v2') && pods.every(p=>p.ver==='v2') ? "1.26" : (pods.every(p=>p.ver==='v1')?"1.25":"mixed"); }
+function render(){
+  const f=document.getElementById("field"); f.innerHTML="";
+  pods.forEach(p=>{ const e=document.createElement("div");
+    e.className="pod "+p.ver+(p.ready?"":" pending");
+    e.innerHTML=`<span>${p.ver==='v1'?'1.25':'1.26'}</span><span class="tag2">${p.ready?'Ready':'…'}</span>`; f.appendChild(e); });
+  const ready=pods.filter(p=>p.ready).length;
+  document.getElementById("cReady").textContent=`ready: ${ready}/${TOTAL}`;
+  document.getElementById("cReady").className="counter "+(ready>=TOTAL-(+document.getElementById("unavail").value)?"good":"warn");
+  document.getElementById("cVer").textContent="serving: "+curVer();
+  document.getElementById("cVer").className="counter "+(curVer()==='mixed'?"warn":"good");
+  document.getElementById("cRev").textContent="revision: "+revision;
+}
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+async function rollTo(targetVer, cause){
+  if(busy) return; busy=true;
+  const surge=+document.getElementById("surge").value;
+  // surge phase: add up to `surge` new pods (not ready), then ready them, then remove an old one
+  while(pods.some(p=>p.ver!==targetVer)){
+    // surge: add new pending pods up to surge budget
+    let added=0;
+    while(added<Math.max(1,surge) && pods.filter(p=>p.ver===targetVer).length < TOTAL){
+      pods.push({ver:targetVer, ready:false}); added++; render(); await sleep(450);
+    }
+    // ready the newest pending
+    pods.filter(p=>!p.ready).forEach(p=>p.ready=true); render(); await sleep(450);
+    // drain: remove one old pod
+    const oi=pods.findIndex(p=>p.ver!==targetVer);
+    if(oi>=0){ pods.splice(oi,1); render(); await sleep(400); }
+    // trim any surge above TOTAL
+    while(pods.length>TOTAL){ const j=pods.findIndex(p=>p.ver!==targetVer); pods.splice(j>=0?j:0,1); }
+    render(); await sleep(150);
+  }
+  revision++; history.push({rev:revision, cause}); setHistory(); render();
+  busy=false;
+}
+function reset(){
+  busy=false; revision=1; history=[{rev:1, cause:"nginx 1.25 - initial release"}];
+  pods=[{ver:'v1',ready:true},{ver:'v1',ready:true},{ver:'v1',ready:true}];
+  setHistory(); render();
+}
+document.getElementById("surge").addEventListener("input",e=>document.getElementById("surgeVal").textContent=e.target.value);
+document.getElementById("unavail").addEventListener("input",e=>{document.getElementById("unavailVal").textContent=e.target.value; render();});
+document.getElementById("rollFwd").addEventListener("click",()=>{ if(curVer()!=="1.26") rollTo('v2',"upgrade nginx 1.25 -> 1.26"); });
+document.getElementById("rollBack").addEventListener("click",()=>{ if(curVer()!=="1.25") rollTo('v1',"rollback to nginx 1.25"); });
+document.getElementById("reset").addEventListener("click",reset);
+reset();
+
+renderQuiz("quiz", [
+  { q: "During a rolling update, why does the service never drop below its capacity guarantee?",
+    options: ["Updates pause all traffic","New pods become Ready before old ones are removed, bounded by maxSurge/maxUnavailable","Kubernetes doubles every pod","The Service buffers requests"], answer: 1,
+    explain: "The Deployment brings up new-version pods and waits for them to be Ready before terminating old ones, within the maxSurge/maxUnavailable limits — so ready capacity stays at or above your minimum." },
+  { q: "After updating to 1.26, what is the old (1.25) ReplicaSet doing?",
+    options: ["Deleted immediately","Scaled to 0 but kept, so rollback is instant","Still serving half the traffic","Converted into the new ReplicaSet"], answer: 1,
+    explain: "A Deployment keeps the old ReplicaSet at 0 replicas. The version's pod template is retained, which is exactly what makes `kubectl rollout undo` fast." },
+  { q: "What populates the human-readable CHANGE-CAUSE in rollout history?",
+    options: ["The image tag automatically","The kubernetes.io/change-cause annotation you set","The pod names","The namespace"], answer: 1,
+    explain: "Set kubernetes.io/change-cause on each change; otherwise history shows <none>. Treat it as mandatory on every release for an auditable trail." },
+  { q: "You roll back from revision 2 to the old template. Why does the new revision number go UP (to 3) instead of back to 1?",
+    options: ["It's a bug","A rollback is just another rolling update toward an old template, so revisions keep climbing","Kubernetes deletes revision 1","Rollbacks don't change the revision"], answer: 1,
+    explain: "Rolling back applies an old pod template as a new change — so it becomes the newest revision. History numbers always increase; they never decrement." }
+]);
+</script>
+</body>
+</html>

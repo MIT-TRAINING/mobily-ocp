@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 3 — Interactive Visualizations | OpenShift Container Platform</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift Container Platform</a>
+  <span class="pill">Module 3 · Workloads, Storage &amp; Networking</span>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Interactive lab · Self-paced</div>
+    <h1>Workloads, Storage &amp; Networking — visualized</h1>
+    <p class="lede">Five hands-on visualizations that make Module 3 click — how to pick the right <strong>workload controller</strong>, how a <strong>rolling update</strong> ships zero-downtime releases (and rolls back), how <strong>Services and DNS</strong> make pods discoverable, how <strong>ConfigMaps, Secrets and PVCs</strong> configure and persist your apps, and the special controllers — <strong>StatefulSets, DaemonSets and Jobs</strong>. Each ends with a short <strong>self-check</strong> quiz.</p>
+  </div>
+
+  <div class="card">
+    <h2>How to use this</h2>
+    <p class="sub" style="margin:0">Work through the five in order (each builds on the last) or jump to any concept. Everything runs in your browser — no install, no internet, no cluster needed. Companion reading: <code>guides/module-03-workloads-storage-networking.md</code>. Then practice for real with the guided <a href="demos/README.md">demos</a> and <a href="exercises/README.md">exercises</a> using <code>kubectl</code> on a <a href="../setup/minikube-kubernetes.md">minikube</a> cluster.</p>
+  </div>
+
+  <div class="viz-grid">
+    <a class="viz-card" href="01-workload-controllers.html">
+      <span class="ix">01</span>
+      <h3>Choosing a Workload Controller</h3>
+      <p>Match a workload to the right controller, then watch the <strong>Deployment → ReplicaSet → Pods</strong> chain scale and self-heal as you disrupt it.</p>
+      <div class="tags"><span class="tag">Deployment</span><span class="tag">ReplicaSet</span><span class="tag">Self-heal</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="02-rolling-updates.html">
+      <span class="ix">02</span>
+      <h3>Rolling Updates &amp; Rollbacks</h3>
+      <p>Ship a new version with <strong>maxSurge</strong> / <strong>maxUnavailable</strong> and watch capacity hold. Then roll back in one click and see the revision history re-number.</p>
+      <div class="tags"><span class="tag">Rollout</span><span class="tag">Rollback</span><span class="tag">Revisions</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="03-services-and-dns.html">
+      <span class="ix">03</span>
+      <h3>Services, Endpoints &amp; DNS</h3>
+      <p>Toggle pod health and labels to watch <strong>EndpointSlices</strong> update live, then compare <strong>ClusterIP</strong>, <strong>NodePort</strong> and an <strong>Ingress</strong> that needs a controller.</p>
+      <div class="tags"><span class="tag">ClusterIP</span><span class="tag">NodePort</span><span class="tag">CoreDNS</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="04-config-and-storage.html">
+      <span class="ix">04</span>
+      <h3>Config &amp; Storage</h3>
+      <p>Inject a <strong>ConfigMap</strong> and <strong>Secret</strong> (and see base64 isn't encryption), then kill the pod on a <strong>PVC</strong> and watch the data survive.</p>
+      <div class="tags"><span class="tag">ConfigMap</span><span class="tag">Secret</span><span class="tag">PVC</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="05-statefulsets-daemonsets-jobs.html">
+      <span class="ix">05</span>
+      <h3>StatefulSets, DaemonSets &amp; Jobs</h3>
+      <p>See stable ordinal pods with their own disks, one pod per node (minus the tainted control-plane), and a Job that runs to completion and stops.</p>
+      <div class="tags"><span class="tag">StatefulSet</span><span class="tag">DaemonSet</span><span class="tag">Job</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="01-workload-controllers.html" style="border-style:dashed;background:var(--surface-2)">
+      <span class="ix">▶</span>
+      <h3>Start here</h3>
+      <p>New to running apps on Kubernetes? Begin with visualization 01 and work straight through. ~25–35 minutes total.</p>
+      <div class="tags"><span class="tag">20 questions total</span></div>
+    </a>
+  </div>
+
+  <div class="card" style="margin-top:24px">
+    <h3 style="margin-top:0">What you'll be able to explain afterwards</h3>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li>Which <strong>workload controller</strong> fits which job — Deployment, StatefulSet, DaemonSet, Job/CronJob — and the <strong>Deployment → ReplicaSet → Pod</strong> ownership chain</li>
+      <li>How <strong>rolling updates</strong> ship releases with no downtime, and how <strong>rollback</strong> returns to a prior revision in one command</li>
+      <li>How a <strong>Service</strong> + <strong>EndpointSlices</strong> + <strong>CoreDNS</strong> give pods a stable identity, and when to use ClusterIP vs NodePort vs Ingress</li>
+      <li>How <strong>ConfigMaps/Secrets</strong> decouple config from the image (and why a Secret is base64, <em>not</em> encrypted), and how a <strong>PVC</strong> persists data beyond a pod's life</li>
+      <li>What <strong>StatefulSets, DaemonSets and Jobs</strong> add that a Deployment can't</li>
+    </ul>
+  </div>
+
+  <div class="card" style="margin-top:6px">
+    <h3 style="margin-top:0">Then take it to a real cluster</h3>
+    <p class="sub" style="margin:0 0 6px">The visualizations build the mental model; these apply it on a real Kubernetes cluster (<a href="../setup/minikube-kubernetes.md">minikube</a>) with <code>kubectl</code>:</p>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li><a href="demos/README.md"><strong>Guided demos</strong></a> — instructor-led tours (deploy &amp; self-heal, rolling updates, service discovery, config &amp; storage, StatefulSets/DaemonSets/Jobs).</li>
+      <li><a href="exercises/README.md"><strong>Exercises</strong></a> — you drive, with validation steps and worked solutions, building up to a multi-tier capstone.</li>
+      <li><a href="../../guides/module-03-workloads-storage-networking.md"><strong>Concept guide</strong></a> — the deep-dive reference for every object here.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>
