@@ -962,6 +962,7 @@ foundation for letting many teams share one cluster safely.
 
 ### Companion material
 
+- **Interactive visualizations:** [`labs/module-03/index.html`](../labs/module-03/index.html) — five browser-based, offline visualizations (workload controllers, rolling updates, services & DNS, config & storage, StatefulSets/DaemonSets/Jobs), each with a self-check quiz.
 - **Demos:** [`labs/module-03/demos/`](../labs/module-03/demos/README.md) — instructor-led walkthroughs.
 - **Exercises:** [`labs/module-03/exercises/`](../labs/module-03/exercises/README.md) — hands-on practice.
 - Previous module: [Module 2 — Kubernetes Foundations & Architecture](module-02-kubernetes-architecture.md).
