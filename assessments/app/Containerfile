@@ -1,0 +1,39 @@
+# selfcare-api — Module 1–3 assignment image
+#
+# Red Hat UBI9 + Python 3.9 (ubi9/python-39) so the skills transfer straight to
+# OpenShift. The base image already runs as a non-root user (UID 1001) and ships
+# a production-ready Python, which is exactly what OpenShift's restricted SCC
+# expects — no root, no privileged ports.
+FROM registry.access.redhat.com/ubi9/python-39:latest
+
+# OCI labels — good hygiene; surfaced by `podman inspect` and registries.
+LABEL org.opencontainers.image.title="selfcare-api" \
+      org.opencontainers.image.description="Mobily self-care subscriber lookup API (training)" \
+      org.opencontainers.image.vendor="Mobily OCP Training"
+
+WORKDIR /app
+
+# App is pure stdlib — nothing to pip install. Copy code + datasets.
+COPY server.py ./
+COPY data/ ./data/
+
+# Build-time version stamp. Lets you produce a distinct image for the rolling
+# update in Assignment 3:  podman build --build-arg APP_VERSION=1.1.0 -t selfcare-api:1.1.0 .
+ARG APP_VERSION=1.0.0
+
+# 12-factor config defaults (override at run time with -e / env / ConfigMap).
+ENV SELFCARE_PORT=8080 \
+    SELFCARE_DATA_DIR=/app/data \
+    SELFCARE_REGION=build-default \
+    SELFCARE_VERSION=${APP_VERSION}
+
+EXPOSE 8080
+
+# Container-native healthcheck. Note: podman's default OCI image format ignores
+# HEALTHCHECK — build with `podman build --format docker` (or use docker) for it
+# to take effect. Kubernetes ignores it entirely and uses its own liveness/
+# readiness probes instead — see the Module 3 assignments.
+HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
+  CMD python3 -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz').status==200 else 1)"
+
+CMD ["python3", "server.py"]

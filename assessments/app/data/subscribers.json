@@ -1,0 +1,10 @@
+[
+  { "msisdn": "966500000001", "name": "Layla Al-Harbi",   "plan": "POST-PLATINUM", "status": "ACTIVE",    "balance_sar": 412.50, "data_gb_left": 38.2 },
+  { "msisdn": "966500000002", "name": "Omar Al-Qahtani",  "plan": "POST-GOLD",     "status": "ACTIVE",    "balance_sar": 96.00,  "data_gb_left": 12.5 },
+  { "msisdn": "966500000003", "name": "Sara Al-Otaibi",   "plan": "PREPAID-FLEX",  "status": "ACTIVE",    "balance_sar": 23.75,  "data_gb_left": 4.1 },
+  { "msisdn": "966500000004", "name": "Yousef Al-Shehri", "plan": "PREPAID-FLEX",  "status": "SUSPENDED", "balance_sar": 0.00,   "data_gb_left": 0.0 },
+  { "msisdn": "966500000005", "name": "Noura Al-Dossari", "plan": "POST-GOLD",     "status": "ACTIVE",    "balance_sar": 188.20, "data_gb_left": 20.0 },
+  { "msisdn": "966500000006", "name": "Khalid Al-Mutairi","plan": "DATA-ONLY-100", "status": "ACTIVE",    "balance_sar": 55.00,  "data_gb_left": 74.6 },
+  { "msisdn": "966500000007", "name": "Maha Al-Ghamdi",   "plan": "POST-PLATINUM", "status": "ACTIVE",    "balance_sar": 530.00, "data_gb_left": 91.3 },
+  { "msisdn": "966500000008", "name": "Faisal Al-Zahrani","plan": "PREPAID-FLEX",  "status": "ACTIVE",    "balance_sar": 7.10,   "data_gb_left": 0.8 }
+]

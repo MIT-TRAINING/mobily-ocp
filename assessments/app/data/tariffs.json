@@ -1,0 +1,6 @@
+[
+  { "code": "POST-PLATINUM", "name": "Postpaid Platinum", "monthly_sar": 350, "data_gb": 100, "minutes": "unlimited", "sms": "unlimited" },
+  { "code": "POST-GOLD",     "name": "Postpaid Gold",     "monthly_sar": 180, "data_gb": 40,  "minutes": 3000,        "sms": 1000 },
+  { "code": "PREPAID-FLEX",  "name": "Prepaid Flex",      "monthly_sar": 0,   "data_gb": 5,   "minutes": "pay-as-you-go", "sms": "pay-as-you-go" },
+  { "code": "DATA-ONLY-100", "name": "Data Only 100GB",   "monthly_sar": 120, "data_gb": 100, "minutes": 0,           "sms": 0 }
+]
