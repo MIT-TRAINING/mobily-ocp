@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MachineConfig &amp; Pools — Interactive | Module 5</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .mcp { border:2px solid var(--line); border-radius:12px; padding:12px; margin-top:8px; }
+  .mcp h4 { margin:0 0 8px; font-size:13px; display:flex; justify-content:space-between; align-items:center; }
+  .mcp.updating { border-color:var(--amber); } .mcp.updated { border-color:var(--green); } .mcp.paused { border-color:var(--purple); }
+  .state-pill { font-size:11px; font-weight:800; padding:2px 9px; border-radius:999px; }
+  .sp-updated { background:var(--green-bg); color:var(--green-ink); }
+  .sp-updating { background:var(--amber-bg); color:var(--amber-ink); }
+  .sp-paused { background:var(--purple-bg); color:var(--purple-ink); }
+  .nodes { display:flex; gap:8px; flex-wrap:wrap; }
+  .nd { width:90px; border:2px solid var(--line); border-radius:10px; padding:8px; text-align:center; background:var(--surface-2); transition:all .4s; }
+  .nd .nm { font-family:var(--mono); font-weight:800; font-size:11px; }
+  .nd .cfg { font-size:9px; color:var(--ink-soft); margin-top:2px; }
+  .nd .ph { font-size:10px; font-weight:800; margin-top:4px; min-height:13px; }
+  .nd.draining { border-color:var(--amber); background:var(--amber-bg); color:var(--amber-ink); }
+  .nd.rebooting { border-color:var(--red); background:var(--red-bg); color:var(--red-ink); }
+  .nd.done { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); }
+  .nd.pending-cfg { border-color:var(--purple); border-style:dashed; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 5</a>
+  <span class="pill">Visualization 3 of 4</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Changing immutable nodes</div>
+    <h1>RHCOS is immutable — so you change it with a MachineConfig.</h1>
+    <p class="lede">Mobily needs a corporate CA on every worker. You don't SSH in — you apply a <strong>MachineConfig</strong> to the worker <strong>MachineConfigPool</strong>, and the <strong>MCO</strong> rolls it out node-by-node, cordon → drain → reboot, keeping the app up.</p>
+  </div>
+
+  <div class="card">
+    <h2>Roll a MachineConfig across the worker pool</h2>
+    <p class="sub">Set how many nodes may update at once (<code>maxUnavailable</code>), optionally <strong>pause</strong> the pool, then apply. Watch capacity stay safe.</p>
+    <div class="slider-row">
+      <label><code>maxUnavailable</code></label>
+      <input type="range" id="maxun" min="1" max="3" value="1">
+      <span class="val" id="maxunVal">1</span>
+    </div>
+    <div class="controls">
+      <button class="btn primary" id="apply">📝 oc apply -f machineconfig.yaml</button>
+      <label class="toggle" id="pauseToggle"><input type="checkbox" id="pauseChk"> Pause worker pool</label>
+      <button class="btn ghost" id="reset">Reset</button>
+    </div>
+
+    <div class="mcp" id="mcpBox">
+      <h4><span>MachineConfigPool / worker</span><span class="state-pill sp-updated" id="mcpState">UPDATED</span></h4>
+      <div class="statebar">
+        <span class="counter match" id="cUpdated">updated: 4/4</span>
+        <span class="counter" id="cUnavail">unavailable: 0</span>
+      </div>
+      <div class="nodes" id="nodes" style="margin-top:8px"></div>
+    </div>
+    <div class="note" id="rollNote" style="margin-top:10px">The pool is <strong>UPDATED</strong> — every worker runs the current rendered config. Apply a MachineConfig to roll a new one out.</div>
+  </div>
+
+  <div class="card">
+    <h2>Why pause a pool?</h2>
+    <div class="grid two">
+      <div class="note"><strong>Batch changes:</strong> pause, apply several MachineConfigs, then unpause once — the MCO renders them together and reboots each node <em>once</em>, not per change.</div>
+      <div class="note"><strong>Protect a window:</strong> pause the worker pool so no reboots happen during a sensitive Mobily billing run; unpause after. Config accumulates safely until then.</div>
+    </div>
+    <div class="note ok" style="margin-top:10px"><code>oc patch mcp worker --type merge -p '{"spec":{"paused":true}}'</code> · check with <code>oc get mcp</code> (master/worker: UPDATED / UPDATING / DEGRADED).</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="02-cluster-health.html">← Verifying cluster health</a>
+    <a class="btn primary" href="04-projects-users-rbac.html">Next: Lifecycle, Projects &amp; RBAC →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const OLD="rendered-worker-a1", NEW="rendered-worker-b2";
+let nodes=[], rolling=false;
+function mkNodes(){ nodes=[0,1,2,3].map(i=>({nm:"worker-"+i, cfg:OLD, st:"done"})); }
+function paused(){ return document.getElementById("pauseChk").checked; }
+function maxun(){ return +document.getElementById("maxun").value; }
+function renderNodes(){
+  const el=document.getElementById("nodes"); el.innerHTML="";
+  nodes.forEach(n=>{ const d=document.createElement("div");
+    d.className="nd "+(n.st==="drain"?"draining":n.st==="reboot"?"rebooting":n.cfg===NEW?"done":n.st==="pending"?"pending-cfg":"");
+    const ph=n.st==="drain"?"cordon+drain":n.st==="reboot"?"reboot":n.cfg===NEW?"✓ updated":n.st==="pending"?"queued (paused)":"current";
+    d.innerHTML=`<div>🖥️</div><div class="nm">${n.nm}</div><div class="cfg">${n.cfg}</div><div class="ph">${ph}</div>`;
+    el.appendChild(d); });
+  const upd=nodes.filter(n=>n.cfg===NEW).length;
+  const unavail=nodes.filter(n=>n.st==="drain"||n.st==="reboot").length;
+  document.getElementById("cUpdated").textContent="updated: "+upd+"/4";
+  document.getElementById("cUpdated").className="counter "+(upd===4?"match":"mismatch");
+  document.getElementById("cUnavail").textContent="unavailable: "+unavail;
+  document.getElementById("cUnavail").className="counter "+(unavail<=maxun()?"match":"mismatch");
+}
+function setMcp(s){
+  const box=document.getElementById("mcpBox"), pill=document.getElementById("mcpState");
+  box.className="mcp "+s; pill.className="state-pill sp-"+s; pill.textContent=s.toUpperCase();
+}
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+async function apply(){
+  if(rolling) return;
+  if(paused()){
+    nodes.forEach(n=>{ if(n.cfg!==NEW) n.st="pending"; }); setMcp("paused"); renderNodes();
+    document.getElementById("rollNote").innerHTML="Pool is <strong>PAUSED</strong> — the new config is <em>queued</em> on every node but no reboots happen. Apply more configs to batch them, then untick <strong>Pause</strong> to roll out once.";
+    return;
+  }
+  rolling=true; document.getElementById("apply").disabled=true; setMcp("updating");
+  const todo=nodes.filter(n=>n.cfg!==NEW);
+  const batch=maxun();
+  for(let i=0;i<todo.length;i+=batch){
+    const group=todo.slice(i,i+batch);
+    group.forEach(n=>n.st="drain"); renderNodes(); await sleep(700);
+    group.forEach(n=>n.st="reboot"); renderNodes(); await sleep(700);
+    group.forEach(n=>{ n.cfg=NEW; n.st="done"; }); renderNodes(); await sleep(350);
+  }
+  setMcp("updated");
+  document.getElementById("rollNote").innerHTML="<strong>Pool UPDATED.</strong> Every worker rebooted into the new rendered config, <strong>"+maxun()+" at a time</strong> (maxUnavailable), draining pods first — the app never lost all replicas. You declared a MachineConfig; the MCO did the rest.";
+  document.getElementById("apply").disabled=false; rolling=false;
+}
+async function unpauseRoll(){
+  if(!nodes.some(n=>n.st==="pending")) return;
+  await apply();
+}
+document.getElementById("apply").addEventListener("click",apply);
+document.getElementById("maxun").addEventListener("input",e=>document.getElementById("maxunVal").textContent=e.target.value);
+document.getElementById("pauseChk").addEventListener("change",e=>{
+  document.getElementById("pauseToggle").classList.toggle("on",e.target.checked);
+  if(!e.target.checked && nodes.some(n=>n.st==="pending")){ unpauseRoll(); }
+});
+document.getElementById("reset").addEventListener("click",()=>{ if(rolling) return; mkNodes(); setMcp("updated");
+  document.getElementById("rollNote").innerHTML="The pool is <strong>UPDATED</strong> — every worker runs the current rendered config. Apply a MachineConfig to roll a new one out."; renderNodes(); });
+mkNodes(); renderNodes();
+
+renderQuiz("quiz", [
+  { q: "How do you add a corporate CA certificate to every RHCOS worker node?",
+    options: ["SSH into each node and copy the file","Apply a MachineConfig targeting the worker pool; the MCO rolls it out","Rebuild every node image manually","Edit the kubelet on each host"], answer: 1,
+    explain: "RHCOS is immutable and cluster-managed. A MachineConfig (an Ignition snippet) targets a MachineConfigPool; the Machine Config Operator renders and rolls it out node-by-node — no SSH." },
+  { q: "What does a MachineConfigPool group?",
+    options: ["Pods that share a label","Nodes that share configuration (master, worker, or custom)","Projects in a cluster","Container images"], answer: 1,
+    explain: "An MCP groups nodes that get the same rendered config. Every cluster has master and worker pools by default; you add custom pools (e.g. infra) to target a subset." },
+  { q: "With maxUnavailable=1 (the default), how does the MCO roll out a change to 4 workers?",
+    options: ["All 4 reboot at once","One node at a time: cordon → drain → reboot, then the next","It never reboots","Only the first node updates"], answer: 1,
+    explain: "maxUnavailable=1 means just one node is taken out of service at a time — safest, so apps with multiple replicas stay up. Raise it to update a big fleet faster, at the cost of capacity." },
+  { q: "Why would you pause a MachineConfigPool?",
+    options: ["To delete it","To batch several changes (reboot each node once) or freeze reboots during a sensitive window","To speed up a single change","Pausing is required before every apply"], answer: 1,
+    explain: "A paused pool accumulates config without rolling out. Unpause to apply everything together (one reboot per node) or to avoid reboots during, say, a billing run." }
+]);
+</script>
+</body>
+</html>
+</content>

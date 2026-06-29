@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Installation Models &amp; Topology — Interactive | Module 5</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .imodels { display:flex; flex-wrap:wrap; gap:8px; }
+  .imodels .btn { flex:1 1 130px; }
+  .imodels .btn.sel { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .topo { display:flex; flex-direction:column; gap:10px; margin-top:6px; }
+  .nrow { border:2px solid var(--line); border-radius:11px; padding:10px; }
+  .nrow h4 { margin:0 0 8px; font-size:13px; display:flex; justify-content:space-between; }
+  .ngrid { display:flex; gap:8px; flex-wrap:wrap; }
+  .nbox { width:62px; height:50px; border-radius:9px; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; font-size:10px; font-weight:750; border:2px solid; transition:all .3s; }
+  .nbox.ctl { border-color:var(--blue); background:var(--blue-bg); color:var(--blue-ink); }
+  .nbox.wrk { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); cursor:pointer; }
+  .nbox.wrk:hover { box-shadow:var(--shadow); }
+  .nbox.inf { border-color:var(--amber); background:var(--amber-bg); color:var(--amber-ink); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 5</a>
+  <span class="pill">Visualization 1 of 4</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Installation &amp; topology</div>
+    <h1>How a cluster gets built — and what it's made of.</h1>
+    <p class="lede">Every OpenShift cluster starts with an <strong>install model</strong> (trading automation for control) and ends as a <strong>topology</strong> of control-plane, worker, and infra nodes. Choose a method, then shape the cluster Mobily needs.</p>
+  </div>
+
+  <div class="card">
+    <h2>Pick an installation model</h2>
+    <p class="sub">More automation ↔ more control. Click a method to see who provisions the machines and the trade-off.</p>
+    <div class="imodels" id="imodels"></div>
+    <div class="grid two" style="margin-top:14px">
+      <div class="metric"><div class="lab"><span>Automation</span><span id="autoPct">—</span></div><div class="bar"><span class="fill-blue" id="autoBar" style="width:0%"></span></div></div>
+      <div class="metric"><div class="lab"><span>Control over infra</span><span id="ctrlPct">—</span></div><div class="bar"><span class="fill-green" id="ctrlBar" style="width:0%"></span></div></div>
+    </div>
+    <div class="note" id="iNote" style="margin-top:8px">Pick a model above to see who builds the machines and what you trade.</div>
+  </div>
+
+  <div class="card">
+    <h2>Shape the cluster topology</h2>
+    <p class="sub">Control plane is fixed at <strong>3</strong> (etcd quorum). Add workers for capacity. Then <strong>click a worker</strong> to promote it to an <strong>infra</strong> node (isolates the platform + saves subscription cores).</p>
+    <div class="slider-row">
+      <label>Worker nodes</label>
+      <input type="range" id="workers" min="1" max="8" value="4">
+      <span class="val" id="workersVal">4</span>
+    </div>
+    <div class="statebar">
+      <span class="counter match" id="cCtl">control plane: 3 ✓ quorum</span>
+      <span class="counter" id="cWrk">workers: 4</span>
+      <span class="counter" id="cInf">infra: 0</span>
+    </div>
+    <div class="topo" id="topo"></div>
+    <div class="note" id="tNote" style="margin-top:10px">Three control-plane nodes give etcd an odd quorum (tolerates losing 1). Workers run your apps. Promote 2–3 workers to <strong>infra</strong> to host the router/registry/monitoring away from app load.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="index.html">← All visualizations</a>
+    <a class="btn primary" href="02-cluster-health.html">Next: Verifying cluster health →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// --- Install models ------------------------------------------------
+const MODELS = [
+  { k:"IPI", auto:90, ctrl:35, w:"<strong>Installer-Provisioned Infrastructure.</strong> The <code>openshift-install</code> binary calls your cloud (AWS/Azure/GCP/vSphere) and creates the VMs, network, and load balancers for you. Fastest path on supported platforms; least control over low-level infra." },
+  { k:"UPI", auto:30, ctrl:95, w:"<strong>User-Provisioned Infrastructure.</strong> You bring the machines, DNS, and load balancers; the installer just bootstraps OpenShift onto them. Most work, most control — the usual choice for bare metal and strict infra standards." },
+  { k:"Assisted", auto:70, ctrl:70, w:"<strong>Assisted Installer.</strong> A hosted, guided UI at <code>console.redhat.com</code> walks you through an on-prem/bare-metal install. Balanced — guided but needs connectivity to the service." },
+  { k:"Agent", auto:60, ctrl:80, w:"<strong>Agent-based installer.</strong> A self-contained bootable ISO with no dependency on a live Red Hat service — the go-to for <strong>disconnected / air-gapped</strong> sites (remote Mobily locations)." },
+  { k:"Hosted CP", auto:80, ctrl:50, w:"<strong>Hosted Control Planes (HyperShift).</strong> Control planes run as <em>pods</em> on a management cluster instead of dedicated nodes — fast, cheap control planes when you need many small clusters." },
+  { k:"ROSA/ARO", auto:98, ctrl:20, w:"<strong>Managed (ROSA/ARO/OSD).</strong> The cloud + Red Hat install and operate the control plane for you. Highest automation; you give up the most low-level control. Not self-managed." }
+];
+const im = document.getElementById("imodels");
+MODELS.forEach((m,i)=>{ const b=document.createElement("button"); b.className="btn ghost"; b.textContent=m.k;
+  b.addEventListener("click",()=>{ document.querySelectorAll("#imodels .btn").forEach(x=>x.classList.remove("sel"));
+    b.classList.add("sel");
+    document.getElementById("iNote").innerHTML=m.w;
+    document.getElementById("autoBar").style.width=m.auto+"%"; document.getElementById("autoPct").textContent=m.auto+"%";
+    document.getElementById("ctrlBar").style.width=m.ctrl+"%"; document.getElementById("ctrlPct").textContent=m.ctrl+"%";
+  });
+  im.appendChild(b); });
+
+// --- Topology builder ----------------------------------------------
+let workers=4, infra=0;
+function renderTopo(){
+  const t=document.getElementById("topo"); t.innerHTML="";
+  const mk=(cls,label)=>{ const d=document.createElement("div"); d.className="nbox "+cls; d.innerHTML=label; return d; };
+  // control plane row
+  const r1=document.createElement("div"); r1.className="nrow";
+  r1.innerHTML='<h4><span>🧠 Control plane</span><span>×3 · quorum</span></h4>';
+  const g1=document.createElement("div"); g1.className="ngrid";
+  for(let i=0;i<3;i++) g1.appendChild(mk("ctl","🧠<span>master-"+i+"</span>"));
+  r1.appendChild(g1); t.appendChild(r1);
+  // worker row
+  const r2=document.createElement("div"); r2.className="nrow";
+  r2.innerHTML='<h4><span>⚙️ Workers (click one → promote to infra)</span><span>×'+workers+'</span></h4>';
+  const g2=document.createElement("div"); g2.className="ngrid";
+  for(let i=0;i<workers;i++){ const b=mk("wrk","⚙️<span>worker-"+i+"</span>"); b.addEventListener("click",promote); g2.appendChild(b); }
+  r2.appendChild(g2); t.appendChild(r2);
+  // infra row
+  if(infra>0){ const r3=document.createElement("div"); r3.className="nrow";
+    r3.innerHTML='<h4><span>🏗️ Infra (router · registry · monitoring)</span><span>×'+infra+'</span></h4>';
+    const g3=document.createElement("div"); g3.className="ngrid";
+    for(let i=0;i<infra;i++) g3.appendChild(mk("inf","🏗️<span>infra-"+i+"</span>"));
+    r3.appendChild(g3); t.appendChild(r3); }
+  document.getElementById("cWrk").textContent="workers: "+workers;
+  document.getElementById("cInf").textContent="infra: "+infra;
+  document.getElementById("cInf").className="counter "+(infra>=2?"match":"");
+}
+function promote(){
+  if(workers<=1) return;
+  workers--; infra++;
+  document.getElementById("workers").value=workers;
+  document.getElementById("workersVal").textContent=workers;
+  document.getElementById("tNote").innerHTML="Promoted a worker → <strong>infra</strong> ("+infra+"). In reality: <code>oc label node … node-role.kubernetes.io/infra=''</code>, add an infra taint, then move the Router/registry/monitoring via each Operator's <code>nodePlacement</code>. "+(infra>=2?"With 2–3 infra nodes the platform is HA and isolated from app load.":"Add one more for HA.");
+  renderTopo();
+}
+document.getElementById("workers").addEventListener("input",e=>{ workers=+e.target.value;
+  document.getElementById("workersVal").textContent=workers; renderTopo(); });
+renderTopo();
+
+renderQuiz("quiz", [
+  { q: "Which install model has the installer create the cloud VMs, network, and load balancers for you?",
+    options: ["UPI","IPI","Agent-based","ROSA only"], answer: 1,
+    explain: "IPI (Installer-Provisioned Infrastructure) calls the cloud/vSphere API to build the machines too — fastest path, least low-level control. UPI is the opposite: you bring the infra." },
+  { q: "A remote Mobily site has no internet connectivity. Which installer fits best?",
+    options: ["Assisted Installer (hosted UI)","Agent-based installer (self-contained ISO)","IPI on AWS","ROSA"], answer: 1,
+    explain: "The Agent-based installer is a self-contained bootable ISO with no dependency on a live Red Hat service — designed for disconnected/air-gapped installs. Assisted needs connectivity; IPI/ROSA are cloud." },
+  { q: "Why is the control plane almost always exactly 3 nodes?",
+    options: ["Licensing requires 3","etcd needs an odd number for quorum; 3 tolerates losing 1","3 is the maximum allowed","Workers must equal control-plane count"], answer: 1,
+    explain: "etcd is a quorum-based store; an odd member count (3) provides HA while tolerating one failure. More app capacity comes from workers, not control-plane nodes." },
+  { q: "What is the main reason to create dedicated infra nodes?",
+    options: ["They run faster","Isolate platform components (router/registry/monitoring) from app load — and they don't count against subscription cores","They replace the control plane","They are required for upgrades"], answer: 1,
+    explain: "Infra nodes are labelled workers that host platform components, isolating that load from applications; workloads on infra nodes are also excluded from subscription core counts." }
+]);
+</script>
+</body>
+</html>
+</content>

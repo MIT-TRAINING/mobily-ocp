@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verifying Cluster Health — Interactive | Module 5</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .panel { border:2px solid var(--line); border-radius:12px; padding:12px; margin-top:10px; }
+  .panel h3 { margin:0 0 6px; font-size:13px; font-family:var(--mono); }
+  .panel.ok { border-color:var(--green); } .panel.bad { border-color:var(--red); background:var(--red-bg); }
+  .row { display:flex; justify-content:space-between; font-family:var(--mono); font-size:12.5px; padding:3px 0; border-bottom:1px dashed var(--line); }
+  .b { font-weight:800; padding:0 7px; border-radius:999px; font-size:11px; }
+  .b.t { background:var(--green-bg); color:var(--green-ink); } .b.f { background:var(--red-bg); color:var(--red-ink); }
+  .b.n { background:var(--amber-bg); color:var(--amber-ink); }
+  .verdict { font-size:18px; font-weight:800; padding:10px 14px; border-radius:11px; margin-top:8px; text-align:center; }
+  .verdict.go { background:var(--green-bg); color:var(--green-ink); }
+  .verdict.stop { background:var(--red-bg); color:var(--red-ink); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 5</a>
+  <span class="pill">Visualization 2 of 4</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Day-2 health</div>
+    <h1>"Is the cluster healthy?" — answer it in three commands.</h1>
+    <p class="lede">Before every release and upgrade, an admin runs the same check: <code>oc get clusterversion</code>, <code>oc get clusteroperators</code>, <code>oc get nodes</code>. Break something below and watch the dashboard — and your go/no-go verdict — change.</p>
+  </div>
+
+  <div class="card">
+    <h2>The health dashboard</h2>
+    <p class="sub">Inject a fault to see how each command surfaces it. Green on all three = safe to proceed.</p>
+    <div class="controls">
+      <button class="btn ghost" id="healthy">✅ Healthy cluster</button>
+      <button class="btn red" id="degradeCo">💥 Degrade an operator</button>
+      <button class="btn red" id="failNode">💥 Node NotReady</button>
+      <button class="btn red" id="upgrading">⏳ Mid-upgrade</button>
+    </div>
+    <div class="verdict go" id="verdict">✅ GO — all three checks green</div>
+
+    <div class="panel" id="pVer"><h3>$ oc get clusterversion</h3><div id="verBody"></div></div>
+    <div class="panel" id="pCo"><h3>$ oc get clusteroperators</h3><div id="coBody"></div></div>
+    <div class="panel" id="pNode"><h3>$ oc get nodes</h3><div id="nodeBody"></div></div>
+
+    <div class="note" id="hNote" style="margin-top:12px">All green: <code>clusterversion</code> Available &amp; not Progressing, no operator Degraded, every node Ready. Safe to ship or upgrade.</div>
+  </div>
+
+  <div class="card">
+    <h2>When it's red — where to look next</h2>
+    <div class="grid two">
+      <div class="note"><strong>Operator DEGRADED →</strong> <code>oc describe co &lt;name&gt;</code> and read the <em>Conditions</em> message. Also <code>oc get events -A --sort-by=.lastTimestamp</code>.</div>
+      <div class="note"><strong>Node NotReady →</strong> <code>oc describe node &lt;n&gt;</code> (kubelet/conditions), <code>oc adm top nodes</code>, <code>oc adm node-logs &lt;n&gt;</code>. Collect <code>oc adm must-gather</code> for support.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="01-installation-and-topology.html">← Installation &amp; topology</a>
+    <a class="btn primary" href="03-machineconfig-pools.html">Next: MachineConfig &amp; pools →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+let state="healthy";
+function bdg(v){ return v==="T"?'<span class="b t">True</span>':v==="F"?'<span class="b f">False</span>':'<span class="b n">'+v+'</span>'; }
+function render(){
+  // clusterversion
+  const ver=document.getElementById("verBody"); const pV=document.getElementById("pVer");
+  let cvAvail="T", cvProg="F", cvStatus="Cluster version is 4.18.20";
+  if(state==="upgrading"){ cvProg="T"; cvStatus="Working towards 4.18.21: 47% complete"; }
+  ver.innerHTML=`<div class="row"><span>version 4.18.20</span><span>AVAILABLE ${bdg(cvAvail)} · PROGRESSING ${bdg(cvProg)}</span></div>`+
+    `<div class="row"><span>status</span><span>${cvStatus}</span></div>`;
+  pV.className="panel "+(state==="upgrading"?"bad":"ok");
+  // clusteroperators
+  const co=document.getElementById("coBody"); const pC=document.getElementById("pCo");
+  const ops=[["authentication","T","F"],["ingress","T","F"],["etcd","T","F"],["image-registry","T","F"],["monitoring","T","F"]];
+  if(state==="degradeCo"){ ops[1]=["ingress","F","T"]; }
+  co.innerHTML=ops.map(o=>`<div class="row"><span>${o[0]}</span><span>AVAILABLE ${bdg(o[1])} · DEGRADED ${bdg(o[2])}</span></div>`).join("");
+  pC.className="panel "+(state==="degradeCo"?"bad":"ok");
+  // nodes
+  const nb=document.getElementById("nodeBody"); const pN=document.getElementById("pNode");
+  const nodes=[["master-0","Ready","control-plane"],["worker-0","Ready","worker"],["worker-1","Ready","worker"],["worker-2","Ready","worker"]];
+  if(state==="failNode"){ nodes[2]=["worker-1","NotReady","worker"]; }
+  nb.innerHTML=nodes.map(n=>`<div class="row"><span>${n[0]} (${n[2]})</span><span>${n[1]==="Ready"?bdg("T").replace("True","Ready"):'<span class="b f">NotReady</span>'}</span></div>`).join("");
+  pN.className="panel "+(state==="failNode"?"bad":"ok");
+  // verdict
+  const v=document.getElementById("verdict");
+  const ok=state==="healthy";
+  v.className="verdict "+(ok?"go":"stop");
+  v.textContent=ok?"✅ GO — all three checks green":"🛑 NO-GO — fix this before any change";
+  const notes={
+    healthy:"All green: <code>clusterversion</code> Available &amp; not Progressing, no operator Degraded, every node Ready. Safe to ship or upgrade.",
+    degradeCo:"🔴 <strong>ingress is DEGRADED</strong> — Routes/external traffic impacted. Next: <code>oc describe co ingress</code> and read the Conditions message. Do <em>not</em> upgrade on a degraded operator.",
+    failNode:"🔴 <strong>worker-1 is NotReady</strong> — its pods get rescheduled, capacity drops. Next: <code>oc describe node worker-1</code> (kubelet?), <code>oc adm node-logs worker-1</code>. Fix before reducing capacity further with an upgrade.",
+    upgrading:"⏳ <strong>clusterversion is PROGRESSING</strong> — an upgrade is already in flight (47%). Never start another change mid-upgrade; wait for Available=True, Progressing=False."
+  };
+  document.getElementById("hNote").innerHTML=notes[state];
+}
+document.getElementById("healthy").addEventListener("click",()=>{state="healthy";render();});
+document.getElementById("degradeCo").addEventListener("click",()=>{state="degradeCo";render();});
+document.getElementById("failNode").addEventListener("click",()=>{state="failNode";render();});
+document.getElementById("upgrading").addEventListener("click",()=>{state="upgrading";render();});
+render();
+
+renderQuiz("quiz", [
+  { q: "Which three commands are the admin's standard cluster-health check?",
+    options: ["oc get pods / svc / routes","oc get clusterversion / clusteroperators / nodes","oc login / whoami / version","oc adm top / events / logs"], answer: 1,
+    explain: "clusterversion (is it healthy/upgrading?), clusteroperators (any DEGRADED?), and nodes (all Ready?) together answer 'is the cluster healthy?' before any change." },
+  { q: "oc get clusterversion shows PROGRESSING=True. What does that mean for your planned change?",
+    options: ["Proceed — it's fine","An upgrade is already in flight; wait until Available=True, Progressing=False","The cluster is broken permanently","You must reinstall"], answer: 1,
+    explain: "Progressing=True means a version change is underway. Don't layer another change on top — wait for the cluster to settle (Available=True, Progressing=False)." },
+  { q: "An operator shows DEGRADED=True. What's the best next step?",
+    options: ["oc delete the operator","oc describe co <name> and read the Conditions message","Restart every node","Ignore it and upgrade"], answer: 1,
+    explain: "The Conditions message on the operator names the root cause. Cluster Operators are self-managed — you diagnose, you don't delete them. Never upgrade on a degraded operator." },
+  { q: "A node is NotReady. What's an appropriate diagnostic?",
+    options: ["oc get clusterversion","oc describe node <n> / oc adm node-logs <n> / oc adm must-gather","oc new-project","oc adm policy who-can"], answer: 1,
+    explain: "describe node shows kubelet/conditions; node-logs reads the journal without SSH; must-gather bundles everything for a support case. who-can/new-project are RBAC/tenant tasks." }
+]);
+</script>
+</body>
+</html>
+</content>

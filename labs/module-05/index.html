@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 5 — Interactive Visualizations | OpenShift Container Platform</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift Container Platform</a>
+  <span class="pill">Module 5 · Installation &amp; Cluster Administration</span>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Interactive lab · Self-paced</div>
+    <h1>Installing &amp; administering OpenShift — visualized</h1>
+    <p class="lede">Four hands-on visualizations that make Module 5 click — how a cluster gets <strong>installed</strong> and what <strong>topology</strong> results, how you <strong>verify cluster health</strong> in three commands, how the <strong>Machine Config Operator</strong> changes immutable nodes safely via <strong>MachineConfigPools</strong>, and how you run the <strong>cluster lifecycle</strong> (channels &amp; upgrades) and manage <strong>Projects, users &amp; RBAC</strong>. Each ends with a short <strong>self-check</strong> quiz.</p>
+  </div>
+
+  <div class="card">
+    <h2>How to use this</h2>
+    <p class="sub" style="margin:0">Work through the four in order (each builds on the last) or jump to any concept. Everything runs in your browser — no install, no internet, no cluster needed. Companion reading: <a href="../../guides/module-05-installation-cluster-administration.md"><code>guides/module-05-installation-cluster-administration.md</code></a>. Then practice for real with the guided <a href="demos/README.md">demos</a> and <a href="exercises/README.md">exercises</a> using <code>oc</code> on the shared OpenShift 4.18 cluster (admin steps are instructor-led).</p>
+  </div>
+
+  <div class="viz-grid">
+    <a class="viz-card" href="01-installation-and-topology.html">
+      <span class="ix">01</span>
+      <h3>Installation Models &amp; Topology</h3>
+      <p>Pick an install method (<strong>IPI / UPI / Assisted / Agent / ROSA</strong>) and see the trade-offs, then build the <strong>control-plane / worker / infra</strong> topology and promote a node to <strong>infra</strong>.</p>
+      <div class="tags"><span class="tag">IPI/UPI</span><span class="tag">Topology</span><span class="tag">Infra nodes</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="02-cluster-health.html">
+      <span class="ix">02</span>
+      <h3>Verifying Cluster Health</h3>
+      <p>Run the admin's <strong>three-command health check</strong> on a live dashboard, then break an operator or a node and watch the triage path to the failing subsystem.</p>
+      <div class="tags"><span class="tag">clusterversion</span><span class="tag">co</span><span class="tag">nodes</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="03-machineconfig-pools.html">
+      <span class="ix">03</span>
+      <h3>MachineConfig &amp; Pools</h3>
+      <p>Apply a <strong>MachineConfig</strong> to the worker <strong>pool</strong> and watch the MCO roll it node-by-node (<strong>maxUnavailable</strong>), then <strong>pause</strong> the pool to batch changes in a window.</p>
+      <div class="tags"><span class="tag">MachineConfig</span><span class="tag">MCP</span><span class="tag">pause</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="04-projects-users-rbac.html">
+      <span class="ix">04</span>
+      <h3>Lifecycle, Projects, Users &amp; RBAC</h3>
+      <p>Drive an <strong>upgrade</strong> across update <strong>channels</strong>, then stand up a tenant — <strong>Project + quota</strong>, a <strong>group</strong>, and an <strong>RBAC</strong> binding — and test access with <code>can-i</code>.</p>
+      <div class="tags"><span class="tag">channels</span><span class="tag">Project/quota</span><span class="tag">RBAC</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="01-installation-and-topology.html" style="border-style:dashed;background:var(--surface-2)">
+      <span class="ix">▶</span>
+      <h3>Start here</h3>
+      <p>New to operating OpenShift? Begin with visualization 01 and work straight through. ~25–35 minutes total.</p>
+      <div class="tags"><span class="tag">16 questions total</span></div>
+    </a>
+  </div>
+
+  <div class="card" style="margin-top:24px">
+    <h3 style="margin-top:0">What you'll be able to explain afterwards</h3>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li>The <strong>installation models</strong> (IPI/UPI/Assisted/Agent/Hosted/managed) and when to use each, and how <strong>topology</strong> (control/worker/infra) is sized</li>
+      <li>The admin's <strong>three-command health check</strong> and how to triage a <strong>DEGRADED</strong> operator or a <strong>NotReady</strong> node</li>
+      <li>How the <strong>Machine Config Operator</strong> rolls a <strong>MachineConfig</strong> across a <strong>MachineConfigPool</strong> safely, and why you'd <strong>pause</strong> a pool</li>
+      <li>How the <strong>CVO</strong> runs the <strong>lifecycle</strong> — channels (stable/fast/eus) and a supervised, drained <strong>upgrade</strong></li>
+      <li>How to manage tenants: <strong>Projects + quotas/limits</strong>, <strong>users/groups</strong>, and least-privilege <strong>RBAC</strong> with <code>oc adm policy</code></li>
+    </ul>
+  </div>
+
+  <div class="card" style="margin-top:6px">
+    <h3 style="margin-top:0">Then take it to a real cluster</h3>
+    <p class="sub" style="margin:0 0 6px">The visualizations build the mental model; these apply it on a real OpenShift cluster with <code>oc</code> (shared 4.18 cluster; admin-only steps are instructor-led):</p>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li><a href="demos/README.md"><strong>Guided demos</strong></a> — instructor-led tours (health check, the MCO &amp; pools, lifecycle/upgrade, Projects/users/RBAC).</li>
+      <li><a href="exercises/README.md"><strong>Exercises</strong></a> — you drive, with validation steps and worked solutions, building to a multi-tenant + RBAC capstone.</li>
+      <li><a href="../../guides/module-05-installation-cluster-administration.md"><strong>Concept guide</strong></a> — the deep-dive reference for every task here.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>
+</content>

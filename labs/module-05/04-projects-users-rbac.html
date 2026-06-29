@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lifecycle, Projects, Users &amp; RBAC — Interactive | Module 5</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .chans { display:flex; gap:8px; flex-wrap:wrap; }
+  .chans .btn { flex:1 1 120px; }
+  .chans .btn.sel { background:var(--green); color:#fff; border-color:var(--green); }
+  .copips { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
+  .cop { font-size:10px; font-family:var(--mono); padding:3px 7px; border-radius:7px; border:2px solid var(--line); background:var(--surface-2); transition:all .3s; }
+  .cop.prog { border-color:var(--amber); background:var(--amber-bg); color:var(--amber-ink); }
+  .cop.done { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); }
+  .rbac-grid { display:flex; flex-wrap:wrap; gap:8px; }
+  .rbtn { flex:1 1 150px; text-align:left; }
+  .rbtn.sel { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .canline { font-family:var(--mono); font-size:12.5px; padding:5px 0; display:flex; justify-content:space-between; border-bottom:1px dashed var(--line); }
+  .yes { color:var(--green-ink); font-weight:800; } .no { color:var(--red-ink); font-weight:800; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 5</a>
+  <span class="pill">Visualization 4 of 4</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Lifecycle &amp; tenancy</div>
+    <h1>Run the lifecycle. Onboard the tenants.</h1>
+    <p class="lede">Two everyday admin jobs: keep the cluster <strong>upgraded</strong> on the right <strong>channel</strong>, and <strong>onboard a team</strong> with a Project, a quota, a group, and least-privilege <strong>RBAC</strong>. Drive both below.</p>
+  </div>
+
+  <div class="card">
+    <h2>Cluster lifecycle: pick a channel &amp; upgrade</h2>
+    <p class="sub">A channel is a risk/stability stream. Pick one, then upgrade — the <strong>CVO</strong> walks the Cluster Operators and the <strong>MCO</strong> reboots nodes (drained), all as one unit.</p>
+    <div class="chans" id="chans"></div>
+    <div class="note" id="chanNote" style="margin-top:8px">Pick a channel to see its risk profile.</div>
+    <div class="controls" style="margin-top:10px">
+      <button class="btn primary" id="upgrade">⬆️ oc adm upgrade --to=4.18.21</button>
+      <button class="btn ghost" id="resetU">Reset</button>
+    </div>
+    <div class="statebar"><span class="counter" id="cv">clusterversion: 4.18.20 · Available</span></div>
+    <div class="copips" id="cops" style="margin-top:6px"></div>
+    <div class="note" id="upNote" style="margin-top:6px">Pre-flight: cluster must be health-green first (Viz 02). Then the CVO drives every operator to the new release in dependency order; worker reboots are drained so apps stay up.</div>
+  </div>
+
+  <div class="card">
+    <h2>Onboard a tenant: Project + quota + group + RBAC</h2>
+    <p class="sub">Stand up <code>team-billing</code> step by step. Each click runs the real <code>oc</code> command shown.</p>
+    <div class="controls">
+      <button class="btn ghost" id="s1">1 · oc new-project team-billing</button>
+      <button class="btn ghost" id="s2">2 · oc create quota (cpu=20,mem=40Gi)</button>
+      <button class="btn ghost" id="s3">3 · oc adm groups new billing-admins + add alice</button>
+      <button class="btn ghost" id="s4">4 · oc adm policy add-role-to-group admin …</button>
+    </div>
+    <div class="statebar" style="margin-top:8px">
+      <span class="counter" id="tProj">project: ✗</span>
+      <span class="counter" id="tQuota">quota: ✗</span>
+      <span class="counter" id="tGroup">group: ✗</span>
+      <span class="counter" id="tRbac">rbac: ✗</span>
+    </div>
+    <div class="note" id="tNote" style="margin-top:8px">Build the tenant left-to-right. RBAC is granted to the <strong>group</strong> (best practice) — onboarding a new dev is then just "add to group."</div>
+  </div>
+
+  <div class="card">
+    <h2>Test access — <code>oc auth can-i … --as</code></h2>
+    <p class="sub">Pick who's asking. Access depends on the RBAC you granted above.</p>
+    <div class="rbac-grid">
+      <button class="btn ghost rbtn" data-who="alice">👤 alice<br><small>in billing-admins group</small></button>
+      <button class="btn ghost rbtn" data-who="carol">👤 carol<br><small>no binding here</small></button>
+      <button class="btn ghost rbtn" data-who="cluster-admin">🔑 cluster-admin<br><small>break-glass</small></button>
+    </div>
+    <div id="canBody" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="03-machineconfig-pools.html">← MachineConfig &amp; pools</a>
+    <a class="btn primary" href="index.html">Done — back to all visualizations →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// --- Channels ------------------------------------------------------
+const CH=[
+  { k:"candidate-4.18", w:"<strong>candidate</strong> — earliest builds, may be withdrawn. <em>Testing only, never production.</em>" },
+  { k:"fast-4.18", w:"<strong>fast</strong> — fully supported the moment a release ships. For early adopters / non-critical clusters." },
+  { k:"stable-4.18", w:"<strong>stable</strong> — promoted to <em>fast</em> first, then to <em>stable</em> after field data. The usual choice for <strong>production</strong>." },
+  { k:"eus-4.18", w:"<strong>eus</strong> — Extended Update Support; enables EUS→EUS hops so enterprises upgrade less often." }
+];
+const ch=document.getElementById("chans");
+CH.forEach((c,i)=>{ const b=document.createElement("button"); b.className="btn ghost"; b.textContent=c.k;
+  b.addEventListener("click",()=>{ document.querySelectorAll("#chans .btn").forEach(x=>x.classList.remove("sel"));
+    b.classList.add("sel"); document.getElementById("chanNote").innerHTML=c.w; });
+  ch.appendChild(b); });
+document.querySelectorAll("#chans .btn")[2].classList.add("sel");
+document.getElementById("chanNote").innerHTML=CH[2].w;
+
+const COPS=["kube-apiserver","etcd","authentication","ingress","image-registry","monitoring","network","console","machine-config"];
+function renderCops(cls){ const el=document.getElementById("cops"); el.innerHTML="";
+  COPS.forEach(n=>{ const d=document.createElement("div"); d.className="cop"+(cls?(" "+cls):""); d.textContent=n; el.appendChild(d); }); }
+renderCops("done");
+let upBusy=false;
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+async function upgrade(){
+  if(upBusy) return; upBusy=true;
+  document.getElementById("cv").textContent="clusterversion: 4.18.20 → 4.18.21 · Progressing";
+  document.getElementById("cv").className="counter mismatch";
+  const el=document.getElementById("cops").children;
+  renderCops("");
+  for(let i=0;i<COPS.length;i++){ el[i].className="cop prog"; await sleep(260); el[i].className="cop done"; await sleep(90); }
+  document.getElementById("cv").textContent="clusterversion: 4.18.21 · Available";
+  document.getElementById("cv").className="counter match";
+  document.getElementById("upNote").innerHTML="<strong>Upgrade complete → 4.18.21.</strong> The CVO walked each Cluster Operator in dependency order and the MCO rebooted nodes (drained). OS + runtime + Kubernetes + platform moved as one tested unit. Verify health-green again before declaring done.";
+  upBusy=false;
+}
+document.getElementById("upgrade").addEventListener("click",upgrade);
+document.getElementById("resetU").addEventListener("click",()=>{ if(upBusy) return; renderCops("done");
+  document.getElementById("cv").textContent="clusterversion: 4.18.20 · Available";
+  document.getElementById("cv").className="counter";
+  document.getElementById("upNote").innerHTML="Pre-flight: cluster must be health-green first (Viz 02). Then the CVO drives every operator to the new release in dependency order; worker reboots are drained so apps stay up."; });
+
+// --- Tenant build --------------------------------------------------
+const T={proj:false,quota:false,group:false,rbac:false};
+function paint(id,key,label){ const ok=T[key]; document.getElementById(id).textContent=label+": "+(ok?"✓":"✗");
+  document.getElementById(id).className="counter "+(ok?"match":""); }
+function refreshT(){ paint("tProj","proj","project"); paint("tQuota","quota","quota");
+  paint("tGroup","group","group"); paint("tRbac","rbac","rbac"); renderCan(); }
+document.getElementById("s1").addEventListener("click",()=>{ T.proj=true;
+  document.getElementById("tNote").innerHTML="Created Project <code>team-billing</code>. The creator gets an <code>admin</code> RoleBinding automatically; everything the team makes is isolated here."; refreshT(); });
+document.getElementById("s2").addEventListener("click",()=>{ if(!T.proj){flash("Create the project first.");return;} T.quota=true;
+  document.getElementById("tNote").innerHTML="Added a <code>ResourceQuota</code> (cpu=20, memory=40Gi). The team can self-serve <em>inside</em> these caps — one runaway pod can't starve the cluster. Pair with a LimitRange for per-pod defaults."; refreshT(); });
+document.getElementById("s3").addEventListener("click",()=>{ T.group=true;
+  document.getElementById("tNote").innerHTML="Created group <code>billing-admins</code> and added <code>alice</code>. Granting access to a <strong>group</strong> means onboarding the next dev is just <code>oc adm groups add-users</code>."; refreshT(); });
+document.getElementById("s4").addEventListener("click",()=>{ if(!T.proj||!T.group){flash("Need the project and the group first.");return;} T.rbac=true;
+  document.getElementById("tNote").innerHTML="Bound the <code>admin</code> role to <code>billing-admins</code> <em>in this project</em> (a RoleBinding, not cluster-wide). Least privilege: project-scoped, group-based, not <code>cluster-admin</code>."; refreshT(); });
+function flash(msg){ document.getElementById("tNote").innerHTML="⚠️ "+msg; }
+
+// --- can-i ---------------------------------------------------------
+let who="alice";
+function renderCan(){
+  const checks=[
+    ["create deployments -n team-billing", who==="alice"&&T.rbac, who==="cluster-admin"],
+    ["delete project team-billing", who==="cluster-admin", who==="cluster-admin"],
+    ["get pods -n team-crm", who==="cluster-admin", who==="cluster-admin"]
+  ];
+  const el=document.getElementById("canBody");
+  el.innerHTML=checks.map(c=>{ const allow=c[1]||c[2];
+    return `<div class="canline"><span>oc auth can-i ${c[0]} --as ${who}</span><span class="${allow?'yes':'no'}">${allow?'yes':'no'}</span></div>`;
+  }).join("");
+}
+document.querySelectorAll(".rbtn").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".rbtn").forEach(x=>x.classList.remove("sel")); b.classList.add("sel");
+  who=b.dataset.who; renderCan();
+}));
+document.querySelector('.rbtn[data-who="alice"]').classList.add("sel");
+refreshT();
+
+renderQuiz("quiz", [
+  { q: "Which update channel is the usual choice for production?",
+    options: ["candidate-4.18","fast-4.18","stable-4.18","none — production never upgrades"], answer: 2,
+    explain: "stable is promoted from fast only after field data accumulates — the right balance of currency and safety for production. candidate is test-only; fast is for early adopters." },
+  { q: "What runs an OpenShift upgrade once you set the target version?",
+    options: ["You SSH to each node and patch it","The CVO walks the Cluster Operators (and the MCO reboots nodes, drained) as one unit","The web console copies files","Each app team upgrades their own pods"], answer: 1,
+    explain: "The Cluster Version Operator drives every Cluster Operator to the new release in dependency order; the MCO rolls RHCOS node-by-node with drains. OS+runtime+k8s+platform move together." },
+  { q: "Best-practice way to grant the billing team admin on their project?",
+    options: ["Give each member cluster-admin","Bind the admin role to a GROUP with a project-scoped RoleBinding","Add a ClusterRoleBinding for each user","Share the kubeadmin password"], answer: 1,
+    explain: "Least privilege: bind a role to a group (so onboarding = add to group), scoped to the project with a RoleBinding — not cluster-wide, and never cluster-admin for routine access." },
+  { q: "What does a ResourceQuota do for a Project?",
+    options: ["Grants users access","Caps the project's TOTAL resource/object consumption","Sets per-pod CPU defaults","Upgrades the cluster"], answer: 1,
+    explain: "ResourceQuota caps the total a project may use (e.g. 20 CPU, 40Gi). Per-pod defaults/min/max are a LimitRange. Access is RBAC. Together quota+limits make a safe tenant." }
+]);
+</script>
+</body>
+</html>
+</content>
