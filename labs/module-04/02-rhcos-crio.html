@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RHCOS &amp; CRI-O — the Node — Interactive | Module 4</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .nstack { display:flex; flex-direction:column; gap:6px; }
+  .nlay { padding:11px 14px; border-radius:10px; border:2px solid var(--line); cursor:pointer; transition:all .2s; }
+  .nlay:hover { transform:translateX(3px); }
+  .nlay.sel { box-shadow:var(--shadow); }
+  .nlay strong { font-size:14px; } .nlay small { display:block; font-weight:500; color:var(--ink-soft); margin-top:1px; }
+  .nodes { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; }
+  .node { flex:1 1 120px; border:2px solid var(--line); border-radius:11px; padding:10px; text-align:center;
+    background:var(--surface-2); transition:all .4s ease; }
+  .node .nm { font-family:var(--mono); font-weight:800; font-size:12px; }
+  .node .ver { font-size:11px; color:var(--ink-soft); margin-top:3px; }
+  .node.draining { border-color:var(--amber); background:var(--amber-bg); color:var(--amber-ink); }
+  .node.rebooting { border-color:var(--red); background:var(--red-bg); color:var(--red-ink); }
+  .node.updated { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); }
+  .node .state { font-size:11px; font-weight:800; margin-top:4px; min-height:14px; }
+  table.cmp { width:100%; border-collapse:collapse; font-size:13.5px; }
+  table.cmp th, table.cmp td { padding:8px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  table.cmp th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  table.cmp td.crio { color:var(--blue-ink); font-weight:600; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 4</a>
+  <span class="pill">Visualization 2 of 4</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · The immutable node</div>
+    <h1>You don't SSH into a node and edit it. You declare it.</h1>
+    <p class="lede">Every OpenShift node runs the same stack: <strong>RHCOS</strong> (immutable RHEL) → <strong>CRI-O</strong> (the runtime) → kubelet → your pods. Explore the layers, then roll a config change across the fleet the OpenShift way — declaratively.</p>
+  </div>
+
+  <div class="card">
+    <h2>The per-node software stack</h2>
+    <p class="sub">Click a layer. This is what runs on <em>every</em> control-plane and worker node — roles are just labels, the stack is identical.</p>
+    <div class="nstack" id="nstack"></div>
+    <div class="note" id="layNote" style="margin-top:12px">Pick a layer above to see what it does and why OpenShift chose it.</div>
+  </div>
+
+  <div class="card">
+    <h2>Immutable updates: a MachineConfig rollout</h2>
+    <p class="sub">A Mobily admin needs a new kernel argument on every worker. On RHCOS you don't <code>ssh + vi</code> — you apply a <code>MachineConfig</code> and the <strong>Machine Config Operator (MCO)</strong> rolls it out node-by-node: cordon → drain → reboot into the new image. Watch capacity stay safe.</p>
+    <div class="controls">
+      <button class="btn primary" id="apply">📝 Apply MachineConfig (new kernel arg)</button>
+      <button class="btn ghost" id="resetN">Reset</button>
+    </div>
+    <div class="nodes" id="nodes"></div>
+    <div class="statebar">
+      <span class="counter" id="cUpd">0/3 updated</span>
+      <span class="counter match" id="cReady">never more than 1 node down</span>
+    </div>
+    <div class="note" id="rollNote">The MCO updates <strong>one node at a time</strong>, draining its pods first, so the subscriber-api keeps serving throughout. Each node reboots into a brand-new, identical OS image — no drift, fully reproducible.</div>
+  </div>
+
+  <div class="card">
+    <h2>Why CRI-O, not Docker?</h2>
+    <p class="sub">CRI-O does exactly one job: be the runtime Kubernetes drives. Less surface area, fewer CVEs, versioned with the cluster.</p>
+    <table class="cmp">
+      <tr><th>Concern</th><th>Docker (classic)</th><th>CRI-O (OpenShift)</th></tr>
+      <tr><td>Scope</td><td>build + run + swarm + CLI + daemon</td><td class="crio">just the Kubernetes CRI</td></tr>
+      <tr><td>Daemon</td><td>one big daemon; if it dies, containers go with it</td><td class="crio">no central daemon</td></tr>
+      <tr><td>Versioning</td><td>"which version is compatible?"</td><td class="crio">tracks the OCP/k8s minor (1.31 ↔ 4.18)</td></tr>
+      <tr><td>OCI lineage</td><td>own image format historically</td><td class="crio">shares Podman/Buildah/runc plumbing</td></tr>
+      <tr><td>Node debug tool</td><td><code>docker ps</code></td><td class="crio"><code>crictl ps</code></td></tr>
+    </table>
+    <div class="note ok" style="margin-top:12px"><strong>Skills transfer:</strong> the <code>ubi9/*</code> images you built with <code>podman</code> in Module 1 run unchanged under CRI-O — same OCI foundations, different driver. <em>Podman is the human's tool; CRI-O is Kubernetes' tool.</em></div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="01-openshift-vs-kubernetes.html">← OpenShift vs Kubernetes</a>
+    <a class="btn primary" href="03-operators-cluster-operators.html">Next: Operators &amp; Cluster Operators →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// --- Node stack ----------------------------------------------------
+const NL = [
+  { t:"Pods / containers (your apps)", s:"subscriber-api, tariff-catalog, SMS gateway", cls:"l-purple",
+    w:"<strong>Your workloads.</strong> The reason the node exists. Everything below is the platform delivering them isolation, networking, and storage." },
+  { t:"kubelet", s:"node agent — talks to the API server", cls:"l-green",
+    w:"<strong>The node's agent.</strong> Watches the API server for pods assigned here, then asks the runtime (via the CRI) to start them, and reports status back. The bridge between the control plane and this host." },
+  { t:"CRI-O", s:"Kubernetes-native container runtime (CRI)", cls:"l-blue",
+    w:"<strong>The runtime.</strong> Implements only the Container Runtime Interface: pull images, create pods/containers, stream logs. No build, no daemon, no swarm. Versioned with the cluster; debug with <code>crictl</code>." },
+  { t:"runc / crun", s:"OCI runtime — actually starts the process", cls:"l-amber",
+    w:"<strong>The low-level runtime.</strong> CRI-O hands off to runc/crun, which uses Linux namespaces &amp; cgroups to actually launch the container process. Same OCI runtime Podman uses." },
+  { t:"RHCOS", s:"immutable RHEL-based node OS", cls:"l-slate",
+    w:"<strong>The operating system.</strong> Red Hat Enterprise Linux CoreOS — read-only root, updated as whole images (ostree), configured by Ignition at first boot, managed by the MCO. Never <code>yum install</code> here." },
+  { t:"Linux kernel", s:"namespaces · cgroups · SELinux", cls:"l-slate",
+    w:"<strong>The foundation.</strong> The kernel primitives that make containers possible — namespaces (isolation), cgroups (limits), SELinux (mandatory access control). Hardened and patched as part of cluster upgrades." }
+];
+const ns = document.getElementById("nstack");
+NL.forEach((L,i)=>{ const d=document.createElement("div"); d.className="nlay layer "+L.cls;
+  d.innerHTML=`<strong>${L.t}</strong><small>${L.s}</small>`;
+  d.addEventListener("click",()=>{ document.querySelectorAll(".nlay").forEach(x=>x.classList.remove("sel"));
+    d.classList.add("sel"); document.getElementById("layNote").innerHTML=L.w; });
+  ns.appendChild(d); });
+
+// --- MachineConfig rollout ----------------------------------------
+const OLD="rhcos 4.18.3", NEW="rhcos 4.18.4";
+let nodes=[], rolling=false;
+function mkNodes(){ nodes=[0,1,2].map(i=>({nm:"cdr-worker-"+i, ver:OLD, st:""})); }
+function renderNodes(){
+  const el=document.getElementById("nodes"); el.innerHTML="";
+  nodes.forEach(n=>{ const d=document.createElement("div");
+    d.className="node "+(n.st==="drain"?"draining":n.st==="reboot"?"rebooting":n.ver===NEW?"updated":"");
+    d.innerHTML=`<div class="nm">🖥️ ${n.nm}</div><div class="ver">${n.ver}</div>`+
+      `<div class="state">${n.st==="drain"?"cordon+drain…":n.st==="reboot"?"rebooting…":n.ver===NEW?"✓ updated":"pending"}</div>`;
+    el.appendChild(d); });
+  const upd=nodes.filter(n=>n.ver===NEW).length;
+  document.getElementById("cUpd").textContent=upd+"/3 updated";
+  document.getElementById("cUpd").className="counter "+(upd===3?"match":"mismatch");
+}
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+async function apply(){
+  if(rolling) return; rolling=true;
+  document.getElementById("apply").disabled=true;
+  for(const n of nodes){
+    n.st="drain"; renderNodes(); await sleep(700);
+    n.st="reboot"; renderNodes(); await sleep(700);
+    n.ver=NEW; n.st=""; renderNodes(); await sleep(350);
+  }
+  document.getElementById("rollNote").innerHTML="<strong>Done — all 3 nodes on "+NEW+", one at a time.</strong> At no point was more than one node unavailable, so the app stayed up. You changed <em>desired state</em> (a MachineConfig); the MCO made it real. That's the reconcile loop applied to the OS itself.";
+  document.getElementById("apply").disabled=false; rolling=false;
+}
+function resetN(){ if(rolling) return; mkNodes(); renderNodes();
+  document.getElementById("rollNote").innerHTML="The MCO updates <strong>one node at a time</strong>, draining its pods first, so the subscriber-api keeps serving throughout. Each node reboots into a brand-new, identical OS image — no drift, fully reproducible."; }
+document.getElementById("apply").addEventListener("click",apply);
+document.getElementById("resetN").addEventListener("click",resetN);
+mkNodes(); renderNodes();
+
+renderQuiz("quiz", [
+  { q: "How do you change a kernel argument on every RHCOS worker node?",
+    options: ["SSH into each node and edit /etc/default/grub","Apply a MachineConfig; the MCO rolls it out node-by-node","Run yum update on the nodes","Edit the kubelet config by hand on each host"], answer: 1,
+    explain: "RHCOS is immutable and cluster-managed. You declare a MachineConfig; the Machine Config Operator cordons, drains, and reboots each node into a new image — no manual SSH editing, no drift." },
+  { q: "Why does OpenShift use CRI-O instead of Docker?",
+    options: ["CRI-O can build images and Docker can't","CRI-O implements only the Kubernetes CRI — smaller surface, fewer CVEs, versioned with the cluster","Docker isn't a container runtime","CRI-O uses a completely different image format you must rebuild for"], answer: 1,
+    explain: "CRI-O does exactly one job (the CRI), has no central daemon, tracks the cluster's k8s version, and shares the OCI/runc lineage of Podman — so your existing images run unchanged." },
+  { q: "What does 'RHCOS is immutable' mean in practice?",
+    options: ["You can never update it","The root filesystem is read-only; updates ship as whole images applied atomically (no yum install on nodes)","It only runs one container ever","It has no kernel"], answer: 1,
+    explain: "Immutable/transactional means the OS is delivered as versioned images and updated atomically with rollback, eliminating configuration drift across the fleet. Day-2 changes go through MachineConfig, not a package manager." },
+  { q: "From Module 1 you built images with podman. On a node, what drives CRI-O to start containers?",
+    options: ["podman","the Docker daemon","the kubelet, over the CRI","systemd directly"], answer: 1,
+    explain: "The kubelet is the node agent; it calls CRI-O over the Container Runtime Interface to create pods/containers. Podman is the human's tool; CRI-O is Kubernetes' tool — same OCI foundations underneath." }
+]);
+</script>
+</body>
+</html>
+</content>

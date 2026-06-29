@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Machine API &amp; Cluster Architecture — Interactive | Module 4</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .roles { display:flex; gap:10px; flex-wrap:wrap; }
+  .role { flex:1 1 180px; border:2px solid var(--line); border-radius:12px; padding:12px; cursor:pointer; transition:all .2s; }
+  .role:hover { transform:translateY(-2px); }
+  .role.sel { box-shadow:var(--shadow); }
+  .role h4 { margin:0 0 4px; font-size:14px; } .role p { margin:0; font-size:12.5px; color:var(--ink-soft); }
+  .role.ctl { border-color:var(--blue); } .role.wrk { border-color:var(--green); } .role.inf { border-color:var(--amber); }
+  .machines { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; min-height:74px; }
+  .mc { width:104px; border:2px solid var(--line); border-radius:11px; padding:9px; text-align:center; background:var(--surface-2); transition:all .4s; }
+  .mc .ph { font-size:11px; font-weight:800; margin-top:4px; min-height:14px; }
+  .mc.provisioning { border-color:var(--amber); background:var(--amber-bg); color:var(--amber-ink); }
+  .mc.booting { border-color:var(--blue); background:var(--blue-bg); color:var(--blue-ink); }
+  .mc.ready { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); }
+  .mc .nm { font-family:var(--mono); font-weight:800; font-size:11px; }
+  .pods-pending { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
+  .pp { width:42px; height:34px; border-radius:7px; border:2px solid var(--red); background:var(--red-bg); color:var(--red-ink);
+    font-size:9px; font-weight:800; display:flex; align-items:center; justify-content:center; transition:all .4s; }
+  .pp.placed { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 4</a>
+  <span class="pill">Visualization 4 of 4</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Declarative infrastructure</div>
+    <h1>Nodes are cattle too. The Machine API herds them.</h1>
+    <p class="lede">The same reconcile loop that manages pods manages the <em>cloud VMs that become your nodes</em>. A <strong>MachineSet</strong> is the ReplicaSet for <strong>Machines</strong>. Scale it, meet the node roles, and let the autoscaler grow the fleet for pending pods.</p>
+  </div>
+
+  <div class="card">
+    <h2>Node roles in an OpenShift cluster</h2>
+    <p class="sub">Click a role. Every node runs the same RHCOS + CRI-O + kubelet stack — roles are just <strong>labels + taints</strong>.</p>
+    <div class="roles">
+      <div class="role ctl" data-r="ctl"><h4>🧠 Control plane ×3</h4><p>API server, etcd, scheduler, controllers + the Operator layer. HA quorum.</p></div>
+      <div class="role wrk" data-r="wrk"><h4>⚙️ Worker (compute) ×N</h4><p>Run your application pods. Scale these for capacity.</p></div>
+      <div class="role inf" data-r="inf"><h4>🏗️ Infra (optional)</h4><p>Labelled workers hosting router, registry, monitoring — isolated from apps.</p></div>
+    </div>
+    <div class="note" id="roleNote" style="margin-top:12px">Pick a role to see what it does and why you'd separate it.</div>
+  </div>
+
+  <div class="card">
+    <h2>MachineSet → Machines → Nodes</h2>
+    <p class="sub">Mobily needs more CDR-processing capacity. Scale the <code>cdr-workers</code> MachineSet — the Machine API provisions VMs, boots <strong>RHCOS</strong> on each (via Ignition), and joins them as worker Nodes. No clicking in the cloud console.</p>
+    <div class="slider-row">
+      <label><code>machineset replicas</code></label>
+      <input type="range" id="reps" min="0" max="6" value="2">
+      <span class="val" id="repsVal">2</span>
+    </div>
+    <div class="statebar">
+      <span class="counter" id="cReps">desired: 2</span>
+      <span class="counter" id="cReady">ready nodes: 2</span>
+    </div>
+    <div class="machines" id="machines"></div>
+    <div class="note" id="msNote"><code>Machine</code> = one host that should exist; <code>MachineSet</code> = a template + a count (the ReplicaSet for Machines). Delete a Machine and the set provisions a replacement — that's worker-node self-healing.</div>
+  </div>
+
+  <div class="card">
+    <h2>Autoscaling: pending pods grow the fleet</h2>
+    <p class="sub">An evening traffic spike creates pods that can't be scheduled (no room). The <strong>ClusterAutoscaler</strong> notices and raises the MachineSet; new nodes appear; the scheduler places the pods.</p>
+    <div class="controls">
+      <button class="btn primary" id="spike">📈 Traffic spike (+4 unschedulable pods)</button>
+      <button class="btn ghost" id="resetA">Reset</button>
+    </div>
+    <div class="pods-pending" id="pending"></div>
+    <div class="statebar"><span class="counter" id="autoState">idle · 2 nodes</span></div>
+    <div class="note" id="autoNote" style="margin-top:6px"><code>Machine</code>/<code>MachineSet</code> are to <em>nodes</em> what <code>Pod</code>/<code>ReplicaSet</code> are to <em>containers</em> — the reconcile loop, one layer down. A MachineAutoscaler sets min/max; the ClusterAutoscaler scales to fit pending pods, then shrinks when demand falls.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="03-operators-cluster-operators.html">← Operators &amp; Cluster Operators</a>
+    <a class="btn primary" href="index.html">Done — back to all visualizations →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// --- Node roles ----------------------------------------------------
+const ROLES={
+  ctl:"<strong>Control plane (master) ×3.</strong> Run the API server, etcd, scheduler, controllers AND the Operator layer (CVO + Cluster Operators). OpenShift defaults to 3 for HA quorum. Must run RHCOS. Tainted so app pods don't normally land here.",
+  wrk:"<strong>Worker (compute) ×N.</strong> Where your application pods run — subscriber-api, tariff-catalog, SMS gateway. Scale these for capacity, usually via a MachineSet. Self-heal through the Machine API.",
+  inf:"<strong>Infra nodes (optional).</strong> Workers labelled to host platform components (router, internal registry, monitoring) so infrastructure load is isolated from — and often licensed separately from — application load."
+};
+document.querySelectorAll(".role").forEach(r=>r.addEventListener("click",()=>{
+  document.querySelectorAll(".role").forEach(x=>x.classList.remove("sel"));
+  r.classList.add("sel"); document.getElementById("roleNote").innerHTML=ROLES[r.dataset.r];
+}));
+
+// --- MachineSet scaling -------------------------------------------
+let reps=2, machines=[], mseq=1, autoExtra=0;
+function mkMachine(ready){ return {id:mseq++, phase:ready?"ready":"new"}; }
+function syncMachines(){
+  const target=reps+autoExtra;
+  while(machines.length<target){ const m=mkMachine(false); machines.push(m); animate(m); }
+  while(machines.length>target){ machines.pop(); }
+  renderMachines();
+}
+function animate(m){
+  m.phase="provisioning"; renderMachines();
+  setTimeout(()=>{ m.phase="booting"; renderMachines(); },650);
+  setTimeout(()=>{ m.phase="ready"; renderMachines(); placePending(); },1300);
+}
+function renderMachines(){
+  const el=document.getElementById("machines"); el.innerHTML="";
+  machines.forEach(m=>{ const d=document.createElement("div");
+    d.className="mc "+(m.phase==="provisioning"?"provisioning":m.phase==="booting"?"booting":m.phase==="ready"?"ready":"");
+    const ph=m.phase==="provisioning"?"provisioning VM…":m.phase==="booting"?"booting RHCOS…":m.phase==="ready"?"✓ Node Ready":"queued";
+    d.innerHTML=`<div>🖥️</div><div class="nm">cdr-w-${String(m.id).padStart(2,'0')}</div><div class="ph">${ph}</div>`;
+    el.appendChild(d); });
+  document.getElementById("cReps").textContent="desired: "+(reps+autoExtra);
+  const ready=machines.filter(m=>m.phase==="ready").length;
+  document.getElementById("cReady").textContent="ready nodes: "+ready;
+  const ok=ready===reps+autoExtra;
+  document.getElementById("cReps").className="counter "+(ok?"match":"mismatch");
+  document.getElementById("cReady").className="counter "+(ok?"match":"mismatch");
+}
+document.getElementById("reps").addEventListener("input",e=>{ reps=+e.target.value;
+  document.getElementById("repsVal").textContent=reps; syncMachines(); });
+for(let i=0;i<2;i++) machines.push(mkMachine(true)); renderMachines();
+
+// --- Autoscaler ----------------------------------------------------
+let pending=[];
+function renderPending(){
+  const el=document.getElementById("pending"); el.innerHTML="";
+  pending.forEach(p=>{ const d=document.createElement("div"); d.className="pp"+(p.placed?" placed":"");
+    d.textContent=p.placed?"✓":"⏳"; el.appendChild(d); });
+}
+function placePending(){
+  const un=pending.filter(p=>!p.placed);
+  un.slice(0,2).forEach(p=>p.placed=true); renderPending();
+  if(pending.length && pending.every(p=>p.placed)){
+    document.getElementById("autoState").textContent="scaled · "+(reps+autoExtra)+" nodes · all pods placed";
+    document.getElementById("autoState").className="counter match";
+    document.getElementById("autoNote").innerHTML="<strong>All pods scheduled.</strong> The ClusterAutoscaler raised the MachineSet, the Machine API provisioned RHCOS nodes, and the scheduler placed the pending pods. When the spike passes it scales the extra Machines back down.";
+  }
+}
+document.getElementById("spike").addEventListener("click",()=>{
+  for(let i=0;i<4;i++) pending.push({placed:false}); renderPending();
+  document.getElementById("autoState").textContent="unschedulable pods detected → autoscaler scaling up…";
+  document.getElementById("autoState").className="counter mismatch";
+  autoExtra+=2; syncMachines();
+});
+document.getElementById("resetA").addEventListener("click",()=>{
+  pending=[]; autoExtra=0; renderPending(); syncMachines();
+  document.getElementById("autoState").textContent="idle · "+reps+" nodes";
+  document.getElementById("autoState").className="counter";
+});
+renderPending();
+
+renderQuiz("quiz", [
+  { q: "What is a MachineSet?",
+    options: ["A group of pods","A template + replica count for Machines — the 'ReplicaSet for nodes'","A type of Service","A storage class"], answer: 1,
+    explain: "A MachineSet declares how many Machines (hosts) of a given template should exist. Scale it and the Machine API provisions/removes VMs that boot RHCOS and join as nodes — the reconcile loop applied to infrastructure." },
+  { q: "How does an OpenShift cluster add worker capacity declaratively?",
+    options: ["SSH into the cloud console and launch VMs by hand","Scale a MachineSet; the Machine API provisions VMs, boots RHCOS, and joins them as nodes","Edit /etc/hosts","Restart the API server"], answer: 1,
+    explain: "You change desired state (replicas); the Machine API Operator calls the cloud/bare-metal provider, RHCOS boots via Ignition, and the new nodes register — no manual provisioning." },
+  { q: "Pods are stuck Pending because no node has room. With autoscaling configured, what happens?",
+    options: ["The pods are deleted","The ClusterAutoscaler raises the MachineSet, new nodes appear, and the scheduler places the pods","Nothing — you must add nodes manually","The cluster downgrades"], answer: 1,
+    explain: "The ClusterAutoscaler watches for unschedulable pods and grows the MachineSet to fit, then shrinks it when demand falls (within the MachineAutoscaler's min/max)." },
+  { q: "What distinguishes a control-plane node from a worker node on RHCOS?",
+    options: ["A different operating system","Different labels and taints — the software stack is identical","Workers have no kubelet","Control-plane nodes run Docker"], answer: 1,
+    explain: "Every node runs the same RHCOS + CRI-O + kubelet stack. Node roles are expressed with labels (node-role.kubernetes.io/master vs /worker) and the control-plane NoSchedule taint." }
+]);
+</script>
+</body>
+</html>
+</content>

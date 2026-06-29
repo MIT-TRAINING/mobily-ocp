@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 4 — Interactive Visualizations | OpenShift Container Platform</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift Container Platform</a>
+  <span class="pill">Module 4 · OpenShift Architecture &amp; Product Overview</span>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Interactive lab · Self-paced</div>
+    <h1>OpenShift Architecture — visualized</h1>
+    <p class="lede">Four hands-on visualizations that make Module 4 click — how <strong>OpenShift extends Kubernetes</strong> into a finished product (stack, portfolio, history), what the immutable node really runs (<strong>RHCOS &amp; CRI-O</strong>), how the platform <strong>runs itself</strong> with the Operator pattern (<strong>Cluster Operators</strong> + the <strong>Cluster Version Operator</strong>), and how the <strong>Machine API</strong> manages the node fleet declaratively. Each ends with a short <strong>self-check</strong> quiz.</p>
+  </div>
+
+  <div class="card">
+    <h2>How to use this</h2>
+    <p class="sub" style="margin:0">Work through the four in order (each builds on the last) or jump to any concept. Everything runs in your browser — no install, no internet, no cluster needed. Companion reading: <a href="../../guides/module-04-openshift-architecture.md"><code>guides/module-04-openshift-architecture.md</code></a>. Then practice for real with the guided <a href="demos/README.md">demos</a> and <a href="exercises/README.md">exercises</a> using <code>oc</code> on the shared OpenShift 4.18 cluster (or the free <a href="https://developers.redhat.com/developer-sandbox">Developer Sandbox</a>).</p>
+  </div>
+
+  <div class="viz-grid">
+    <a class="viz-card" href="01-openshift-vs-kubernetes.html">
+      <span class="ix">01</span>
+      <h3>OpenShift vs Kubernetes &amp; the Stack</h3>
+      <p>Toggle the layers OpenShift adds on top of certified Kubernetes, walk the <strong>v1→v4</strong> release history, and compare the <strong>product portfolio</strong> (OCP, ROSA, SNO…).</p>
+      <div class="tags"><span class="tag">vs Kubernetes</span><span class="tag">Stack</span><span class="tag">Portfolio</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="02-rhcos-crio.html">
+      <span class="ix">02</span>
+      <h3>RHCOS &amp; CRI-O — the Node</h3>
+      <p>Climb the <strong>per-node software stack</strong> (RHCOS → CRI-O → kubelet → pods), watch a <strong>MachineConfig</strong> roll out to an immutable OS, and see why CRI-O isn't Docker.</p>
+      <div class="tags"><span class="tag">RHCOS</span><span class="tag">CRI-O</span><span class="tag">MachineConfig</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="03-operators-cluster-operators.html">
+      <span class="ix">03</span>
+      <h3>Operators &amp; Cluster Operators</h3>
+      <p>Run an Operator's <strong>reconcile loop</strong>, then read the live <strong>Cluster Operators</strong> board (Available / Progressing / Degraded) and watch the <strong>CVO</strong> drive an upgrade.</p>
+      <div class="tags"><span class="tag">Operator</span><span class="tag">CRD/CR</span><span class="tag">CVO</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="04-machine-api-cluster-architecture.html">
+      <span class="ix">04</span>
+      <h3>Machine API &amp; Cluster Architecture</h3>
+      <p>Scale a <strong>MachineSet</strong> and watch VMs become Nodes, explore the <strong>control / worker / infra</strong> roles, and let the <strong>autoscaler</strong> grow the fleet for pending pods.</p>
+      <div class="tags"><span class="tag">MachineSet</span><span class="tag">Node roles</span><span class="tag">Autoscaler</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="01-openshift-vs-kubernetes.html" style="border-style:dashed;background:var(--surface-2)">
+      <span class="ix">▶</span>
+      <h3>Start here</h3>
+      <p>New to OpenShift after learning Kubernetes? Begin with visualization 01 and work straight through. ~25–35 minutes total.</p>
+      <div class="tags"><span class="tag">16 questions total</span></div>
+    </a>
+  </div>
+
+  <div class="card" style="margin-top:24px">
+    <h3 style="margin-top:0">What you'll be able to explain afterwards</h3>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li>Exactly what <strong>OpenShift adds on top of Kubernetes</strong> — and why each layer (OS, runtime, ingress, auth, registry, monitoring, console) exists</li>
+      <li>The <strong>v3 → v4</strong> self-managing shift, and how to place every member of the <strong>product portfolio</strong> (OCP, ROSA/ARO, SNO, MicroShift, Sandbox, OKD)</li>
+      <li>Why nodes run <strong>immutable RHCOS</strong> (you declare a MachineConfig; the MCO rolls it out) and why the runtime is <strong>CRI-O</strong>, not Docker</li>
+      <li>The <strong>Operator pattern</strong> (CRD + CR + reconcile loop) and how OpenShift runs <em>itself</em> via <strong>Cluster Operators</strong> coordinated by the <strong>CVO</strong></li>
+      <li>How the <strong>Machine API</strong> applies the reconcile loop to infrastructure, and the <strong>control / worker / infra</strong> node roles</li>
+    </ul>
+  </div>
+
+  <div class="card" style="margin-top:6px">
+    <h3 style="margin-top:0">Then take it to a real cluster</h3>
+    <p class="sub" style="margin:0 0 6px">The visualizations build the mental model; these apply it on a real OpenShift cluster with <code>oc</code> (shared 4.18 cluster, or the free <a href="https://developers.redhat.com/developer-sandbox">Developer Sandbox</a>):</p>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li><a href="demos/README.md"><strong>Guided demos</strong></a> — instructor-led tours (<code>oc</code> &amp; console, nodes/RHCOS/CRI-O, Cluster Operators &amp; CVO, the Machine API).</li>
+      <li><a href="exercises/README.md"><strong>Exercises</strong></a> — you drive, with validation steps and worked solutions: <code>oc</code> CLI essentials, cluster architecture, Cluster Operators, and the Machine API + console capstone.</li>
+      <li><a href="../../guides/module-04-openshift-architecture.md"><strong>Concept guide</strong></a> — the deep-dive reference for every component here.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>
+</content>

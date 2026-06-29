@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operators &amp; Cluster Operators — Interactive | Module 4</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .loop { display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; margin:6px 0 12px; }
+  .lstep { padding:8px 12px; border-radius:10px; border:2px solid var(--line); font-weight:700; font-size:13px; background:var(--surface-2); transition:all .3s; }
+  .lstep.hot { border-color:var(--purple); background:var(--purple-bg); color:var(--purple-ink); transform:scale(1.06); }
+  .arrow { color:var(--muted); font-weight:800; }
+  .managed { display:flex; gap:8px; flex-wrap:wrap; min-height:60px; padding:12px; border:2px dashed var(--line); border-radius:12px; background:var(--surface-2); }
+  .mres { width:74px; height:56px; border-radius:9px; border:2px solid var(--green); background:var(--green-bg);
+    color:var(--green-ink); font-size:10px; font-weight:750; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; transition:all .3s; }
+  .mres.dying { border-color:var(--red); background:var(--red-bg); color:var(--red-ink); transform:scale(.85); opacity:.3; }
+  .coboard { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; }
+  .co { border:2px solid var(--line); border-radius:9px; padding:8px 10px; background:var(--surface); font-size:12.5px; }
+  .co .conm { font-family:var(--mono); font-weight:700; font-size:11.5px; }
+  .co .dots { margin-top:5px; display:flex; gap:5px; }
+  .dot { font-size:10px; font-weight:800; padding:1px 6px; border-radius:999px; }
+  .dot.a { background:var(--green-bg); color:var(--green-ink); }
+  .dot.p { background:var(--amber-bg); color:var(--amber-ink); }
+  .dot.d { background:var(--red-bg); color:var(--red-ink); }
+  .co.deg { border-color:var(--red); background:var(--red-bg); }
+  .co.prog { border-color:var(--amber); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 4</a>
+  <span class="pill">Visualization 3 of 4</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Software that operates software</div>
+    <h1>OpenShift runs itself with Operators.</h1>
+    <p class="lede">An <strong>Operator</strong> is a controller that encodes a human expert's ops knowledge as a reconcile loop. First drive one yourself; then see how OpenShift's <em>own</em> platform — ~30 <strong>Cluster Operators</strong> coordinated by the <strong>CVO</strong> — is built the exact same way.</p>
+  </div>
+
+  <div class="card">
+    <h2>An Operator's reconcile loop</h2>
+    <p class="sub">A Mobily team installs an <code>SMSGateway</code> Operator. You edit one Custom Resource — <code>kind: SMSGateway, size: N</code> — and the Operator makes reality match. Scale it, then break it.</p>
+    <div class="loop">
+      <span class="lstep" id="s1">watch CR</span><span class="arrow">→</span>
+      <span class="lstep" id="s2">diff desired vs actual</span><span class="arrow">→</span>
+      <span class="lstep" id="s3">act</span><span class="arrow">↺</span>
+    </div>
+    <div class="slider-row">
+      <label><code>spec.size</code> (desired)</label>
+      <input type="range" id="size" min="0" max="6" value="3">
+      <span class="val" id="sizeVal">3</span>
+    </div>
+    <div class="statebar">
+      <span class="counter" id="cDes">desired: 3</span>
+      <span class="counter" id="cAct">actual: 3</span>
+      <span class="counter match" id="cSt">reconciled ✓</span>
+    </div>
+    <div class="controls" style="margin-top:8px">
+      <button class="btn red" id="kill">💥 Delete a managed pod (drift)</button>
+      <label class="toggle on" id="opToggle"><input type="checkbox" id="opChk" checked> Operator running</label>
+    </div>
+    <h3>Resources the Operator manages</h3>
+    <div class="managed" id="managed"></div>
+    <div class="note" id="opNote">You edit the <strong>Custom Resource</strong> (desired state); the Operator reconciles the real <strong>Deployments, Services, Secrets and Routes</strong> to match. This is the Module 2 reconcile loop — now applied to a <em>whole application</em>, not just pods.</div>
+  </div>
+
+  <div class="card">
+    <h2>The CRD + CR that make it possible</h2>
+    <div class="grid two">
+      <div>
+        <h3 style="margin-top:0">CRD — extends the API</h3>
+        <p class="sub" style="margin:0 0 6px">Installed once (by OLM). After this, <code>SMSGateway</code> is as real to the API server as <code>Deployment</code>.</p>
+        <div class="note"><code>kind: CustomResourceDefinition<br>name: smsgateways.telecom.mobily</code><br>→ unlocks <code>oc get smsgateway</code>, RBAC, etcd storage — free.</div>
+      </div>
+      <div>
+        <h3 style="margin-top:0">CR — an instance (desired state)</h3>
+        <div class="note"><code>kind: SMSGateway<br>metadata: { name: sms-prod }<br>spec:<br>&nbsp;&nbsp;size: 3<br>&nbsp;&nbsp;tlsEnabled: true</code></div>
+        <p class="sub" style="margin:6px 0 0">The Operator watches CRs of this kind and reconciles.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>OpenShift's own platform: Cluster Operators</h2>
+    <p class="sub">The same pattern runs OpenShift itself. <code>oc get clusteroperators</code> shows ~30 of them — each owns one slice of the platform, each reports <strong>Available / Progressing / Degraded</strong>. Trigger an upgrade, then break one and triage it.</p>
+    <div class="controls">
+      <button class="btn primary" id="upgrade">⬆️ oc adm upgrade (CVO walks them)</button>
+      <button class="btn red" id="breakco">💥 Degrade 'ingress'</button>
+      <button class="btn ghost" id="healco">Reset</button>
+    </div>
+    <div class="statebar"><span class="counter" id="cvoState">clusterversion: 4.18.3 · healthy</span></div>
+    <div class="coboard" id="coboard" style="margin-top:10px"></div>
+    <div class="note" id="coNote" style="margin-top:12px">The <strong>Cluster Version Operator (CVO)</strong> reads the desired release image and drives every Cluster Operator to that version <em>in dependency order</em>. When triaging a sick cluster, the first column to scan is <strong>DEGRADED</strong>.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="02-rhcos-crio.html">← RHCOS &amp; CRI-O</a>
+    <a class="btn primary" href="04-machine-api-cluster-architecture.html">Next: Machine API &amp; architecture →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// --- Operator reconcile loop --------------------------------------
+let desired=3, res=[], seq=1;
+function mkRes(){ return {id:seq++}; }
+function pulse(){ ["s1","s2","s3"].forEach((id,i)=>setTimeout(()=>{
+  document.querySelectorAll(".lstep").forEach(x=>x.classList.remove("hot"));
+  document.getElementById(id).classList.add("hot");
+  if(i===2) setTimeout(()=>document.getElementById(id).classList.remove("hot"),250);
+}, i*180)); }
+function renderRes(){
+  const el=document.getElementById("managed"); el.innerHTML="";
+  res.forEach(r=>{ const d=document.createElement("div"); d.className="mres"; d.dataset.id=r.id;
+    d.innerHTML=`<span>📨 sms</span><span>...${String(r.id).padStart(2,'0')}</span>`; el.appendChild(d); });
+  document.getElementById("cDes").textContent="desired: "+desired;
+  document.getElementById("cAct").textContent="actual: "+res.length;
+  const ok=res.length===desired, c=document.getElementById("cSt");
+  c.textContent=ok?"reconciled ✓":"reconciling…"; c.className="counter "+(ok?"match":"mismatch");
+  document.getElementById("cDes").className="counter "+(ok?"match":"mismatch");
+  document.getElementById("cAct").className="counter "+(ok?"match":"mismatch");
+}
+function reconcile(){
+  if(!document.getElementById("opChk").checked) return;
+  if(res.length<desired){ res.push(mkRes()); pulse(); renderRes(); }
+  else if(res.length>desired){ res.pop(); pulse(); renderRes(); }
+}
+setInterval(reconcile,800);
+document.getElementById("size").addEventListener("input",e=>{ desired=+e.target.value;
+  document.getElementById("sizeVal").textContent=desired; renderRes(); });
+document.getElementById("kill").addEventListener("click",()=>{
+  if(!res.length) return; const i=Math.floor(Math.random()*res.length), r=res[i];
+  const el=document.querySelector(`.mres[data-id='${r.id}']`); if(el) el.classList.add("dying");
+  setTimeout(()=>{ res=res.filter(x=>x.id!==r.id); renderRes(); },300);
+  document.getElementById("opNote").innerHTML=document.getElementById("opChk").checked
+    ? "Drift detected → the Operator's loop sees actual &lt; desired and recreates the resource. <strong>Self-healing is the loop.</strong>"
+    : "Operator is <strong>off</strong> — the deleted resource stays gone. Turn it back on and the loop heals the drift.";
+});
+document.getElementById("opChk").addEventListener("change",e=>
+  document.getElementById("opToggle").classList.toggle("on",e.target.checked));
+for(let i=0;i<3;i++) res.push(mkRes()); renderRes();
+
+// --- Cluster Operators board --------------------------------------
+const CONAMES=["authentication","console","dns","etcd","image-registry","ingress",
+  "kube-apiserver","machine-api","monitoring","network","storage","operator-lifecycle-manager"];
+let cos=[];
+function initCO(){ cos=CONAMES.map(n=>({n, a:true, p:false, d:false})); }
+function renderCO(){
+  const el=document.getElementById("coboard"); el.innerHTML="";
+  cos.forEach(o=>{ const c=document.createElement("div");
+    c.className="co"+(o.d?" deg":o.p?" prog":"");
+    c.innerHTML=`<div class="conm">${o.n}</div><div class="dots">`+
+      `<span class="dot a">A:${o.a?"T":"F"}</span>`+
+      `<span class="dot p">P:${o.p?"T":"F"}</span>`+
+      `<span class="dot d">D:${o.d?"T":"F"}</span></div>`;
+    el.appendChild(c); });
+}
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+let busy=false;
+async function upgrade(){
+  if(busy) return; busy=true;
+  document.getElementById("cvoState").textContent="clusterversion: 4.18.3 → 4.18.4 · Progressing";
+  document.getElementById("cvoState").className="counter mismatch";
+  for(const o of cos){ o.p=true; renderCO(); await sleep(300); o.p=false; renderCO(); await sleep(120); }
+  document.getElementById("cvoState").textContent="clusterversion: 4.18.4 · healthy";
+  document.getElementById("cvoState").className="counter match";
+  document.getElementById("coNote").innerHTML="<strong>Upgrade complete.</strong> The CVO walked each Cluster Operator to 4.18.4 in dependency order — the MCO rolled RHCOS on every node too. The whole stack (OS + runtime + Kubernetes + platform services) moved as <em>one tested unit</em>. That's why an OpenShift upgrade is one command.";
+  busy=false;
+}
+function breakco(){
+  const o=cos.find(x=>x.n==="ingress"); o.a=false; o.d=true; renderCO();
+  document.getElementById("cvoState").textContent="clusterversion: 4.18.3 · 1 operator DEGRADED";
+  document.getElementById("cvoState").className="counter mismatch";
+  document.getElementById("coNote").innerHTML="🔴 <strong>ingress is DEGRADED &amp; not Available</strong> — Routes/external traffic are impacted. Triage: <code>oc get co ingress</code> then <code>oc describe co ingress</code>. The DEGRADED column points you at the failing subsystem before you ever look at a pod.";
+}
+function healco(){ initCO(); renderCO();
+  document.getElementById("cvoState").textContent="clusterversion: 4.18.3 · healthy";
+  document.getElementById("cvoState").className="counter match"; }
+document.getElementById("upgrade").addEventListener("click",upgrade);
+document.getElementById("breakco").addEventListener("click",breakco);
+document.getElementById("healco").addEventListener("click",healco);
+initCO(); renderCO();
+
+renderQuiz("quiz", [
+  { q: "What two things make the Operator pattern possible?",
+    options: ["A Dockerfile and a Service","A CRD (new API kind) and a CR (an instance) plus a reconcile loop","A Route and a ConfigMap","etcd and the scheduler only"], answer: 1,
+    explain: "A CustomResourceDefinition extends the API with a new kind; a Custom Resource is an instance expressing desired state; the Operator (a controller) watches CRs and reconciles reality toward them." },
+  { q: "You delete a pod the SMSGateway Operator manages, with the Operator running. What happens?",
+    options: ["It stays deleted","The Operator's loop sees actual < desired and recreates it","The CRD is deleted","The whole cluster restarts"], answer: 1,
+    explain: "It's the same reconcile loop as a ReplicaSet, but at application scope. Desired state is unchanged, so the Operator heals the drift by recreating the resource." },
+  { q: "How does OpenShift run its OWN platform components (router, registry, monitoring…)?",
+    options: ["Hand-installed by admins","As ~30 Cluster Operators, each owning one slice, coordinated by the CVO","As plain Deployments with no controller","Only through the web console"], answer: 1,
+    explain: "OpenShift uses its own Operator pattern: each Cluster Operator manages one platform area and reports Available/Progressing/Degraded; the Cluster Version Operator drives them all to the release version." },
+  { q: "A user reports the console is down. Which command best starts your triage?",
+    options: ["oc delete pods --all","oc get clusteroperators (scan the DEGRADED column)","oc adm upgrade","podman ps"], answer: 1,
+    explain: "Checking Cluster Operators (with oc get clusterversion) tells you which platform subsystem is DEGRADED — the fastest path to the failing component before drilling into pods." }
+]);
+</script>
+</body>
+</html>
+</content>

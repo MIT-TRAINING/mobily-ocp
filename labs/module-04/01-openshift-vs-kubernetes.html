@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenShift vs Kubernetes &amp; the Stack — Interactive | Module 4</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .laystack { display:flex; flex-direction:column-reverse; gap:8px; }
+  .lay { padding:12px 14px; border-radius:11px; border:2px solid var(--line); background:var(--surface-2);
+    transition:all .3s ease; }
+  .lay.k8s { border-color:var(--blue); background:var(--blue-bg); color:var(--blue-ink); }
+  .lay.ocp { border-color:var(--purple); background:var(--purple-bg); color:var(--purple-ink); }
+  .lay.hidden { opacity:.18; filter:grayscale(1); }
+  .lay strong { font-size:14px; } .lay small { display:block; font-weight:500; opacity:.85; margin-top:2px; }
+  .lay .badge { float:right; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; }
+  .badge.k { background:var(--blue); color:#fff; } .badge.o { background:var(--purple); color:#fff; }
+  .era-btns { display:flex; flex-wrap:wrap; gap:8px; }
+  .era-btns .btn { flex:1 1 90px; }
+  .era-btns .btn.sel { background:var(--purple); color:#fff; border-color:var(--purple); }
+  .timeline { display:flex; gap:4px; margin:14px 0 6px; }
+  .tnode { flex:1; height:8px; border-radius:999px; background:var(--slate-bg); }
+  .tnode.on { background:var(--purple); }
+  .pcard { border:2px solid var(--line); border-radius:12px; padding:12px; cursor:pointer; transition:all .2s; background:var(--surface); }
+  .pcard:hover { border-color:var(--blue); }
+  .pcard.sel { border-color:var(--blue); background:var(--blue-bg); }
+  .pcard h4 { margin:0 0 4px; font-size:14px; } .pcard p { margin:0; font-size:12.5px; color:var(--ink-soft); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 4</a>
+  <span class="pill">Visualization 1 of 4</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · OpenShift = Kubernetes + a product</div>
+    <h1>OpenShift doesn't replace Kubernetes. It finishes it.</h1>
+    <p class="lede">Upstream Kubernetes is an engine; OpenShift is the whole car. Toggle the layers below to see <strong>what OpenShift adds on top of certified Kubernetes</strong>, then walk the release history and place each product in the portfolio.</p>
+  </div>
+
+  <div class="card">
+    <h2>What does OpenShift add?</h2>
+    <p class="sub">Flip the switch. <span style="color:var(--blue-ink);font-weight:700">Blue</span> layers are stock Kubernetes; <span style="color:var(--purple-ink);font-weight:700">purple</span> layers are what OpenShift integrates and supports on top.</p>
+    <div class="controls">
+      <label class="toggle on" id="modeToggle"><input type="checkbox" id="modeChk" checked> Show OpenShift layers</label>
+      <span class="counter" id="layerCount"></span>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--blue)"></i> Certified Kubernetes</span>
+      <span><i style="background:var(--purple)"></i> Added &amp; supported by OpenShift</span>
+    </div>
+    <div class="laystack" id="stack"></div>
+    <div class="note" id="stackNote">OpenShift is <strong>certified, conformant Kubernetes</strong> — every object from Modules 1–3 works unchanged — plus the purple layers that make it a finished, self-managing, supported product.</div>
+  </div>
+
+  <div class="card">
+    <h2>How it got here — release history</h2>
+    <p class="sub">Click an era. The big break is <strong>v3 → v4</strong>: from "you manage RHEL nodes" to a self-managing, Operator-driven platform.</p>
+    <div class="timeline" id="timeline"></div>
+    <div class="era-btns" id="eraBtns"></div>
+    <div class="note" id="eraNote" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
+    <h2>The product portfolio</h2>
+    <p class="sub">"OpenShift" is a family. Click a member — the question is always <em>who operates it, and where</em>.</p>
+    <div class="grid two" id="portfolio"></div>
+    <div class="note" id="pNote" style="margin-top:12px">Pick a product above. <strong>This course teaches OCP</strong> (self-managed), with the free Developer Sandbox as the lab fallback.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="index.html">← All visualizations</a>
+    <a class="btn primary" href="02-rhcos-crio.html">Next: RHCOS &amp; CRI-O →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// --- Layer stack ---------------------------------------------------
+const LAYERS = [
+  { t:"RHCOS + CRI-O", s:"immutable node OS + Kubernetes-native runtime", k:false },
+  { t:"Certified Kubernetes", s:"API server · etcd · scheduler · controllers · kubelet", k:true },
+  { t:"Operators · OLM · Cluster Operators · SCC · Projects", s:"the platform runs itself; secure, multi-tenant defaults", k:false },
+  { t:"Router/Routes · internal registry · OAuth login", s:"ingress, image storage and user auth out of the box", k:false },
+  { t:"Monitoring · Logging · Web Console", s:"Prometheus/Alertmanager + admin & developer UI", k:false },
+  { t:"S2I · Pipelines (Tekton) · GitOps (Argo CD)", s:"build-from-source and deployment workflows", k:false }
+];
+let showOCP = true;
+function renderStack(){
+  const el = document.getElementById("stack"); el.innerHTML = "";
+  let shown = 0;
+  LAYERS.forEach(L=>{
+    const d = document.createElement("div");
+    const isOCP = !L.k;
+    d.className = "lay " + (L.k ? "k8s" : "ocp") + ((isOCP && !showOCP) ? " hidden" : "");
+    if (!(isOCP && !showOCP)) shown++;
+    d.innerHTML = `<span class="badge ${L.k?'k':'o'}">${L.k?'K8s':'OCP'}</span>`+
+      `<strong>${L.t}</strong><small>${L.s}</small>`;
+    el.appendChild(d);
+  });
+  document.getElementById("layerCount").textContent = showOCP
+    ? `${shown} layers — the full product` : `1 layer — just the engine`;
+  document.getElementById("layerCount").className = "counter " + (showOCP ? "match" : "mismatch");
+}
+document.getElementById("modeChk").addEventListener("change", e=>{
+  showOCP = e.target.checked;
+  document.getElementById("modeToggle").classList.toggle("on", showOCP);
+  document.getElementById("stackNote").innerHTML = showOCP
+    ? "OpenShift is <strong>certified, conformant Kubernetes</strong> — every object from Modules 1–3 works unchanged — plus the purple layers that make it a finished, self-managing, supported product."
+    : "This is roughly what <strong>upstream Kubernetes</strong> gives you: the engine and the API. Everything purple, you'd have to choose, integrate, secure, and support <em>yourself</em>.";
+  renderStack();
+});
+
+// --- Release history -----------------------------------------------
+const ERAS = [
+  { y:"v1–v2 (2011)", on:1, txt:"<strong>Classic PaaS.</strong> Red Hat's own \"gears\" &amp; cartridges — <em>before</em> Docker/Kubernetes. Historical context only; nothing carries forward." },
+  { y:"v3 (2015)", on:2, txt:"<strong>Re-platformed onto Kubernetes + Docker</strong>, running on <strong>RHEL</strong> nodes you installed and patched yourself. Powerful — but you still owned the OS, runtime, and day-2 wiring." },
+  { y:"v4 (2019→)", on:4, txt:"<strong>The self-managing leap.</strong> Nodes run <strong>RHCOS</strong>, runtime is <strong>CRI-O</strong>, and the whole platform is run by <strong>Operators</strong>. The cluster installs and upgrades itself as one tested unit." },
+  { y:"4.18 (2025)", on:5, txt:"<strong>The course cluster.</strong> Current stable 4.x line (≈ Kubernetes 1.31), OVN-Kubernetes networking, ~4-month minor cadence with EUS streams for enterprises." }
+];
+function renderTimeline(sel){
+  const tl = document.getElementById("timeline"); tl.innerHTML = "";
+  for(let i=0;i<5;i++){ const n=document.createElement("div");
+    n.className="tnode"+(i < ERAS[sel].on ? " on":""); tl.appendChild(n); }
+}
+const eb = document.getElementById("eraBtns");
+ERAS.forEach((e,i)=>{ const b=document.createElement("button"); b.className="btn ghost"; b.textContent=e.y;
+  b.addEventListener("click",()=>{ document.querySelectorAll("#eraBtns .btn").forEach(x=>x.classList.remove("sel"));
+    b.classList.add("sel"); document.getElementById("eraNote").innerHTML=e.txt; renderTimeline(i); });
+  eb.appendChild(b); });
+
+// --- Portfolio -----------------------------------------------------
+const PROD = [
+  { n:"OCP ★", d:"Self-managed — you run it on bare metal, VMware, or any cloud.", w:"<strong>OpenShift Container Platform</strong> — the product <em>this course</em> teaches. You operate the cluster; Red Hat supports it. Mobily's on-prem/private-cloud platform." },
+  { n:"ROSA / ARO", d:"Managed by the cloud + Red Hat on AWS / Azure.", w:"<strong>ROSA</strong> (AWS) and <strong>ARO</strong> (Azure) are jointly operated — you get OpenShift without running the control plane yourself." },
+  { n:"OpenShift Dedicated", d:"Red Hat SRE-operated, single-tenant.", w:"<strong>OpenShift Dedicated</strong> on AWS/GCP — Red Hat's SRE team operates a dedicated cluster for you." },
+  { n:"SNO / MicroShift", d:"Edge footprints — one node, or constrained devices.", w:"<strong>Single-Node OpenShift</strong> = control plane + worker on one box (cell sites); <strong>MicroShift</strong> = a minimal footprint for field/edge devices." },
+  { n:"Developer Sandbox ★", d:"Free, hosted, time-boxed.", w:"<strong>Free</strong> Red Hat-hosted OpenShift for learning — your <em>lab fallback</em>. You're a project member, not cluster-admin." },
+  { n:"OKD", d:"Community upstream, unsupported.", w:"<strong>OKD</strong> is the community distribution OCP is built from — great for tinkering, no commercial support." }
+];
+const pf = document.getElementById("portfolio");
+PROD.forEach(p=>{ const c=document.createElement("div"); c.className="pcard";
+  c.innerHTML=`<h4>${p.n}</h4><p>${p.d}</p>`;
+  c.addEventListener("click",()=>{ document.querySelectorAll(".pcard").forEach(x=>x.classList.remove("sel"));
+    c.classList.add("sel"); document.getElementById("pNote").innerHTML=p.w; });
+  pf.appendChild(c); });
+
+renderStack(); renderTimeline(2); document.querySelectorAll("#eraBtns .btn")[2].classList.add("sel");
+document.getElementById("eraNote").innerHTML = ERAS[2].txt;
+
+renderQuiz("quiz", [
+  { q: "Which statement about OpenShift and Kubernetes is correct?",
+    options: ["OpenShift replaces Kubernetes with a different orchestrator","OpenShift is certified Kubernetes plus integrated, supported product layers","OpenShift removes Pods and Deployments in favour of its own objects","Kubernetes is built on top of OpenShift"], answer: 1,
+    explain: "OpenShift IS conformant Kubernetes — every Pod/Deployment/Service still works — with added layers (RHCOS, CRI-O, Operators, Routes, OAuth, registry, monitoring, console) and commercial support." },
+  { q: "What fundamentally changed at OpenShift v3 → v4?",
+    options: ["It dropped Kubernetes","It became self-managing: RHCOS + CRI-O + Operators install and upgrade the whole stack","It moved from cloud to on-prem only","It removed the web console"], answer: 1,
+    explain: "v3 ran on RHEL nodes you managed; v4 introduced immutable RHCOS, CRI-O, and an Operator-driven platform that installs and upgrades itself as one unit." },
+  { q: "Mobily wants OpenShift on AWS but does NOT want to operate the control plane. Best fit?",
+    options: ["OKD","Self-managed OCP on EC2","ROSA (Red Hat OpenShift on AWS)","MicroShift"], answer: 2,
+    explain: "ROSA is jointly managed by AWS and Red Hat — you get OpenShift without running the control plane. Self-managed OCP would put that burden back on Mobily; OKD is unsupported; MicroShift targets edge devices." },
+  { q: "You only have an internet connection and want to practice oc for free. Which product?",
+    options: ["OpenShift Dedicated","Developer Sandbox","Single-Node OpenShift","ARO"], answer: 1,
+    explain: "The Developer Sandbox is free, hosted, and time-boxed — ideal for learning. The others are paid/self-operated or edge footprints." }
+]);
+</script>
+</body>
+</html>
+</content>
