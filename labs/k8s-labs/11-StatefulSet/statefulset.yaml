@@ -32,12 +32,11 @@ spec:
         image: nginx
         volumeMounts:
         - name: www
-          mountPath: /var/www/
+          mountPath: /usr/share/nginx/html
   volumeClaimTemplates:
   - metadata:
       name: www
     spec:
-      storageClassName: hostpath
       accessModes:
         - ReadWriteOnce
       resources:

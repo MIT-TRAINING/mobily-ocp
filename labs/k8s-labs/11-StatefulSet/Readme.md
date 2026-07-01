@@ -1,4 +1,4 @@
-# 08-StatefulSet
+# 11-StatefulSet
 
 Let's now create a StafulSet.
 
@@ -16,15 +16,16 @@ Let's now create a StafulSet.
 
 ## Create a file in nginx-sts-2
 
-Open a session in nginx-sts-2 and create a file in the folder mapped to the volume.
+Open a session in nginx-sts-2 and create a file in the folder mapped to the
+volume. The volume is mounted at `/usr/share/nginx/html`, which is also nginx's
+web root, so anything written here is both persisted on the PVC and served.
 
     kubectl exec nginx-sts-2 -it -- /bin/sh
-    cd var/www
+    cd /usr/share/nginx/html
     echo Hello > hello.txt
 
 ## Modify the default Web page
 
-    cd /usr/share/nginx/html
     cat > index.html
     Hello
     Ctrl-D
@@ -47,7 +48,7 @@ Delete a pod and watch as it is recreated with the same name.
 Open a session in nginx-sts-2 and see if the file is still present.
 
     kubectl exec nginx-sts-2 -it -- /bin/sh
-    ls var/www
+    ls /usr/share/nginx/html
     exit
 
 ## Cleanup
