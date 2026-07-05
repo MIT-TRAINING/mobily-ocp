@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 6 — Interactive Visualizations | OpenShift Container Platform</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift Container Platform</a>
+  <span class="pill">Module 6 · Networking, Routes &amp; Multi-Tenancy</span>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Interactive lab · Self-paced</div>
+    <h1>OpenShift networking — visualized</h1>
+    <p class="lede">Three hands-on visualizations that make Module 6 click — how a packet travels the <strong>four networks</strong> from user to pod via <strong>Services &amp; DNS</strong>, how <strong>Routes</strong> expose apps with <strong>edge / passthrough / re-encrypt</strong> TLS (and how they compare to Ingress), and how <strong>NetworkPolicies</strong> turn a wide-open pod network into isolated <strong>multi-tenancy</strong>. Each ends with a short <strong>self-check</strong> quiz.</p>
+  </div>
+
+  <div class="card">
+    <h2>How to use this</h2>
+    <p class="sub" style="margin:0">Work through the three in order (each builds on the last) or jump to any concept. Everything runs in your browser — no install, no internet, no cluster needed. Companion reading: <a href="../../guides/module-06-networking-routes-multitenancy.md"><code>guides/module-06-networking-routes-multitenancy.md</code></a>. Then practice for real with the guided <a href="demos/README.md">demos</a> and <a href="exercises/README.md">exercises</a> using <code>oc</code> on the shared OpenShift 4.18 cluster.</p>
+  </div>
+
+  <div class="viz-grid">
+    <a class="viz-card" href="01-networking-services-dns.html">
+      <span class="ix">01</span>
+      <h3>Networking, Services &amp; DNS</h3>
+      <p>Follow a request across the <strong>four networks</strong> (external → node → service → pod), watch <strong>CoreDNS</strong> resolve a Service name, and see <strong>ClusterIP</strong> load-balance across endpoints.</p>
+      <div class="tags"><span class="tag">OVN-Kubernetes</span><span class="tag">Service/DNS</span><span class="tag">ClusterIP</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="02-routes-and-tls.html">
+      <span class="ix">02</span>
+      <h3>Routes &amp; TLS Termination</h3>
+      <p>Expose a Service with a <strong>Route</strong>, then switch between <strong>edge</strong>, <strong>passthrough</strong> and <strong>re-encrypt</strong> and see exactly where TLS is decrypted — plus how Ingress becomes a Route.</p>
+      <div class="tags"><span class="tag">Route</span><span class="tag">edge/passthrough/reencrypt</span><span class="tag">Ingress</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="03-network-policies-multitenancy.html">
+      <span class="ix">03</span>
+      <h3>NetworkPolicies &amp; Multi-Tenancy</h3>
+      <p>Start on a wide-open pod network, apply <strong>default-deny</strong>, then add <strong>allow</strong> rules — and watch a cross-tenant connection get <strong>blocked</strong> while the sanctioned path stays open.</p>
+      <div class="tags"><span class="tag">NetworkPolicy</span><span class="tag">default-deny</span><span class="tag">tenant isolation</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="01-networking-services-dns.html" style="border-style:dashed;background:var(--surface-2)">
+      <span class="ix">▶</span>
+      <h3>Start here</h3>
+      <p>New to OpenShift networking? Begin with visualization 01 and work straight through. ~20–30 minutes total.</p>
+      <div class="tags"><span class="tag">12 questions total</span></div>
+    </a>
+  </div>
+
+  <div class="card" style="margin-top:24px">
+    <h3 style="margin-top:0">What you'll be able to explain afterwards</h3>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li>The <strong>four networks</strong> (node / pod / service / external) and how a request flows user → router → Service → pod</li>
+      <li>How <strong>Services + CoreDNS</strong> give pods stable identity, and why <strong>ClusterIP</strong> is the OpenShift norm</li>
+      <li>How <strong>Routes</strong> expose apps, and where TLS terminates for <strong>edge</strong>, <strong>passthrough</strong> and <strong>re-encrypt</strong> — plus <strong>Route vs Ingress</strong></li>
+      <li>How <strong>NetworkPolicies</strong> work (additive, allow-only, default-deny) and why a policy-less pod is wide open</li>
+      <li>How to combine Project + RBAC + quota + NetworkPolicy into real <strong>multi-tenant isolation</strong></li>
+    </ul>
+  </div>
+
+  <div class="card" style="margin-top:6px">
+    <h3 style="margin-top:0">Then take it to a real cluster</h3>
+    <p class="sub" style="margin:0 0 6px">The visualizations build the mental model; these apply it on a real OpenShift cluster with <code>oc</code> (shared 4.18 cluster):</p>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li><a href="demos/README.md"><strong>Guided demos</strong></a> — instructor-led tours (Services &amp; DNS, Routes &amp; TLS, NetworkPolicies for tenant isolation).</li>
+      <li><a href="exercises/README.md"><strong>Exercises</strong></a> — you drive, with validation steps and worked solutions, building to a secured multi-tenant capstone.</li>
+      <li><a href="../../guides/module-06-networking-routes-multitenancy.md"><strong>Concept guide</strong></a> — the deep-dive reference for every object here.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

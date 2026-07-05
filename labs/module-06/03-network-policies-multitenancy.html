@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetworkPolicies &amp; Multi-Tenancy — Interactive | Module 6</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--red-bg); color:var(--red-ink); }
+  .pols { display:flex; flex-direction:column; gap:8px; }
+  .pol { display:flex; align-items:center; gap:10px; border:2px solid var(--line); border-radius:10px; padding:9px 12px; cursor:pointer; transition:all .2s; }
+  .pol.on { border-color:var(--blue); background:var(--blue-bg); color:var(--blue-ink); }
+  .pol input { width:16px; height:16px; accent-color:var(--blue); }
+  .pol .nm { font-family:var(--mono); font-weight:700; font-size:12.5px; }
+  .pol .ds { font-size:11.5px; color:var(--ink-soft); }
+  .pol.on .ds { color:var(--blue-ink); }
+  .conns { display:flex; flex-direction:column; gap:7px; margin-top:4px; }
+  .conn { display:flex; justify-content:space-between; align-items:center; border:2px solid var(--line); border-radius:10px; padding:9px 12px; font-size:13px; transition:all .3s; }
+  .conn .path { font-family:var(--mono); font-size:12px; }
+  .conn.ok { border-color:var(--green); background:var(--green-bg); }
+  .conn.block { border-color:var(--red); background:var(--red-bg); }
+  .verdict { font-weight:800; font-size:12px; padding:3px 10px; border-radius:999px; }
+  .verdict.ok { background:var(--green); color:#fff; } .verdict.block { background:var(--red); color:#fff; }
+  .tag2 { font-size:10px; font-weight:700; padding:1px 7px; border-radius:999px; background:var(--slate-bg); color:var(--slate); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 6</a>
+  <span class="pill">Visualization 3 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Firewalling the pod network</div>
+    <h1>Open by default. Locked by policy.</h1>
+    <p class="lede">The pod network starts wide open — <em>any</em> pod can reach <em>any</em> pod, even across tenants. <strong>NetworkPolicies</strong> are additive allow-only rules that fix that. Toggle policies for <code>team-billing</code> and watch the connection verdicts — and cross-tenant isolation — change live.</p>
+  </div>
+
+  <div class="card">
+    <h2>Policies in project <code>team-billing</code></h2>
+    <p class="sub">Tick to apply. Remember: a pod with <em>no</em> policy is fully open; the moment a <strong>default-deny</strong> selects it, only explicitly-allowed traffic gets through.</p>
+    <div class="pols" id="pols"></div>
+  </div>
+
+  <div class="card">
+    <h2>Connection tests</h2>
+    <p class="sub">Live verdicts recompute from the active policies above. Watch the <span style="color:var(--red-ink);font-weight:700">cross-tenant</span> connection.</p>
+    <div class="statebar"><span class="counter" id="summary"></span></div>
+    <div class="conns" id="conns" style="margin-top:8px"></div>
+    <div class="note" id="npNote" style="margin-top:10px">With no policies, everything is allowed — including <code>team-crm</code> reaching the billing database. Not what you want on a shared cluster.</div>
+  </div>
+
+  <div class="card">
+    <h2>The multi-tenancy recipe</h2>
+    <p class="sub">Network isolation is one layer; a real tenant boundary stacks several.</p>
+    <div class="grid two">
+      <div class="note"><strong>Per-project baseline:</strong> <code>default-deny-ingress</code> + <code>allow-same-namespace</code> + <code>allow-from-ingress</code>. New projects can get these automatically via a project template.</div>
+      <div class="note"><strong>Full stack:</strong> Project + <strong>RBAC</strong> (who) + <strong>ResourceQuota/LimitRange</strong> (how much) + <strong>NetworkPolicy</strong> (who talks to whom) + route sharding (how exposed). Isolate by default, share by exception.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="02-routes-and-tls.html">← Routes &amp; TLS termination</a>
+    <a class="btn primary" href="index.html">Done — back to all visualizations →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// policy state
+const P={ deny:false, sameNs:false, fromIngress:false, apiToDb:false };
+const POLS=[
+  { k:"deny", nm:"default-deny-ingress", ds:"podSelector:{} · policyTypes:[Ingress] — selects every billing pod, allows nothing in" },
+  { k:"sameNs", nm:"allow-same-namespace", ds:"ingress from podSelector:{} in this namespace — billing pods may reach billing pods" },
+  { k:"fromIngress", nm:"allow-from-ingress", ds:"ingress from the ingress namespace — lets the HAProxy router in" },
+  { k:"apiToDb", nm:"allow-api-to-db", ds:"subscriber-db ← subscriber-api on TCP 5432 — the one sanctioned DB path" }
+];
+// connections: [id, label, path, source, dest, ns-of-source]
+const CONNS=[
+  { id:"r2s", label:"Router → self-care", path:"ingress-ns ➜ self-care (billing)", kind:"ingress", dst:"self-care" },
+  { id:"a2d", label:"subscriber-api → subscriber-db", path:"billing ➜ billing (same ns)", kind:"samens", dst:"subscriber-db" },
+  { id:"c2d", label:"CRM pod → subscriber-db", path:"team-crm ➜ billing (cross-tenant)", kind:"cross", dst:"subscriber-db", cross:true },
+  { id:"c2s", label:"CRM pod → self-care", path:"team-crm ➜ billing (cross-tenant)", kind:"cross", dst:"self-care", cross:true }
+];
+function allowed(c){
+  // No default-deny selecting billing pods => open network => everything allowed
+  if(!P.deny) return true;
+  // default-deny active: allow only if a matching allow rule exists
+  if(c.kind==="ingress")  return P.fromIngress;
+  if(c.kind==="samens")   return P.sameNs || P.apiToDb;   // api->db matches either
+  if(c.kind==="cross")    return false;                    // no allow opens cross-tenant here
+  return false;
+}
+function renderPols(){
+  const el=document.getElementById("pols"); el.innerHTML="";
+  POLS.forEach(p=>{ const d=document.createElement("label"); d.className="pol"+(P[p.k]?" on":"");
+    d.innerHTML=`<input type="checkbox" ${P[p.k]?"checked":""}><span><span class="nm">${p.nm}</span><br><span class="ds">${p.ds}</span></span>`;
+    d.querySelector("input").addEventListener("change",e=>{ P[p.k]=e.target.checked; renderPols(); renderConns(); });
+    el.appendChild(d); });
+}
+function renderConns(){
+  const el=document.getElementById("conns"); el.innerHTML="";
+  let okc=0;
+  CONNS.forEach(c=>{ const ok=allowed(c); if(ok) okc++;
+    const d=document.createElement("div"); d.className="conn "+(ok?"ok":"block");
+    d.innerHTML=`<span>${c.label} ${c.cross?'<span class="tag2">cross-tenant</span>':''}<br><span class="path">${c.path}</span></span>`+
+      `<span class="verdict ${ok?'ok':'block'}">${ok?'✅ allowed':'⛔ blocked'}</span>`;
+    el.appendChild(d); });
+  document.getElementById("summary").textContent=okc+"/4 connections allowed";
+  document.getElementById("summary").className="counter "+(!P.deny?"mismatch":"match");
+  // guidance
+  let note;
+  if(!P.deny){ note="Wide open — <strong>no default-deny</strong> selects the billing pods, so every connection (incl. cross-tenant CRM → billing DB) is allowed. This is the dangerous default on a shared cluster."; }
+  else {
+    const crossBlocked = !allowed(CONNS[2]) && !allowed(CONNS[3]);
+    const routerOk = allowed(CONNS[0]); const dbOk = allowed(CONNS[1]);
+    if(crossBlocked && routerOk && dbOk){ note="🎯 <strong>Ideal baseline.</strong> default-deny blocks everything, then allow-rules re-open exactly the sanctioned paths (router in, api→db) while <strong>cross-tenant stays blocked</strong>. Isolate by default, share by exception."; }
+    else if(crossBlocked && (!routerOk || !dbOk)){ note="Cross-tenant is now <strong>blocked</strong> 👍 — but you've also blocked a path you need. default-deny blocks the router and same-namespace too, so add <code>allow-from-ingress</code> (or the app is unreachable) and the api→db allow."; }
+    else { note="default-deny is on. Add allow-rules to restore sanctioned traffic — the cross-tenant CRM connections stay blocked no matter what (no rule opens them)."; }
+  }
+  document.getElementById("npNote").innerHTML=note;
+}
+renderPols(); renderConns();
+
+renderQuiz("quiz", [
+  { q: "On a fresh OpenShift project with NO NetworkPolicies, which pods can reach a given pod?",
+    options: ["None — deny by default","Any pod in any namespace — the pod network is open by default","Only pods in the same namespace","Only the router"], answer: 1,
+    explain: "The pod network is flat and open until a policy selects a pod. That convenience is dangerous on a shared cluster — hence default-deny baselines." },
+  { q: "What does an empty podSelector:{} with policyTypes:[Ingress] and no ingress rules do?",
+    options: ["Allows all ingress","Selects every pod and denies all ingress (default-deny)","Deletes the pods","Only affects egress"], answer: 1,
+    explain: "Selecting pods with no allow rules flips them to default-deny for that direction. This empty policy is the classic default-deny-ingress baseline for a namespace." },
+  { q: "After applying default-deny, your app with a Route is suddenly unreachable from outside. Why?",
+    options: ["The Route was deleted","default-deny also blocks the HAProxy router; you must allow ingress from the ingress namespace","TLS expired","DNS broke"], answer: 1,
+    explain: "default-deny blocks everything not explicitly allowed — including the router. Add an allow-from-ingress policy (matching the ingress namespace label) so the router can reach your pods." },
+  { q: "NetworkPolicies are best described as…",
+    options: ["Deny rules you subtract","Additive, allow-only rules; anything not allowed (once a pod is selected) is denied","Router configuration","RBAC for users"], answer: 1,
+    explain: "There is no deny rule — you add allow rules. A pod stays open until selected by a policy; then only explicitly-allowed traffic passes. Isolation comes from default-deny + targeted allows." }
+]);
+</script>
+</body>
+</html>

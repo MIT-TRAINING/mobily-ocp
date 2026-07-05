@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Routes &amp; TLS Termination — Interactive | Module 6</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .modes { display:flex; gap:8px; flex-wrap:wrap; }
+  .modes .btn { flex:1 1 150px; }
+  .modes .btn.sel { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .pipe { display:flex; align-items:stretch; gap:0; margin:14px 0; flex-wrap:wrap; }
+  .seg { flex:1 1 0; min-width:120px; display:flex; flex-direction:column; align-items:center; }
+  .node2 { width:100%; border:2px solid var(--line); border-radius:11px; padding:12px 8px; text-align:center; font-weight:750; font-size:12.5px; background:var(--surface-2); }
+  .node2 .sub { font-size:10px; color:var(--ink-soft); font-weight:500; margin-top:2px; }
+  .link { display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; font-family:var(--mono); padding:6px 2px; width:100%; }
+  .link.enc { color:var(--green-ink); } .link.plain { color:var(--red-ink); }
+  .lock { font-size:20px; margin-bottom:4px; }
+  .cmd { font-family:var(--mono); font-size:12.5px; background:var(--slate-bg); border-radius:9px; padding:10px 12px; margin-top:8px; white-space:pre-wrap; }
+  table.cmp { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; }
+  table.cmp th, table.cmp td { padding:7px 9px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  table.cmp th { color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.03em; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 6</a>
+  <span class="pill">Visualization 2 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Exposing apps securely</div>
+    <h1>Where does TLS get decrypted?</h1>
+    <p class="lede">A <strong>Route</strong> publishes a Service at a public hostname through the HAProxy <strong>Router</strong>. The one decision that matters: <strong>edge</strong>, <strong>passthrough</strong>, or <strong>re-encrypt</strong> — i.e. <em>where the lock opens</em>. Flip between them and watch the encryption change.</p>
+  </div>
+
+  <div class="card">
+    <h2>Pick a TLS termination mode</h2>
+    <div class="modes" id="modes"></div>
+    <div class="pipe" id="pipe"></div>
+    <div class="statebar"><span class="counter" id="encState"></span></div>
+    <div class="note" id="modeNote" style="margin-top:8px"></div>
+    <div class="cmd" id="cmd"></div>
+  </div>
+
+  <div class="card">
+    <h2>When to use which</h2>
+    <table class="cmp">
+      <tr><th>Mode</th><th>Router decrypts?</th><th>Cert lives at</th><th>Use when</th></tr>
+      <tr><td><strong>edge</strong></td><td>✅ yes → HTTP to pod</td><td>the Route</td><td>simplest HTTPS; pod speaks HTTP; trusted internal net (public self-care portal)</td></tr>
+      <tr><td><strong>passthrough</strong></td><td>❌ never sees plaintext</td><td>the pod</td><td>mutual TLS / cert pinning; app owns TLS (SMS gateway ↔ carrier)</td></tr>
+      <tr><td><strong>re-encrypt</strong></td><td>✅ decrypts, then re-encrypts</td><td>Route <em>and</em> pod</td><td>end-to-end encryption AND L7 routing (PCI-style billing API)</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Route vs Kubernetes Ingress</h2>
+    <p class="sub">On OpenShift they're not rivals — click to see how an Ingress is fulfilled.</p>
+    <div class="controls">
+      <button class="btn ghost" id="useRoute">Create a <strong>Route</strong></button>
+      <button class="btn ghost" id="useIngress">Create an <strong>Ingress</strong></button>
+    </div>
+    <div class="note" id="ingNote" style="margin-top:8px">Pick one to compare.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="01-networking-services-dns.html">← Networking, Services &amp; DNS</a>
+    <a class="btn primary" href="03-network-policies-multitenancy.html">Next: NetworkPolicies &amp; multi-tenancy →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// --- TLS modes -----------------------------------------------------
+const MODES={
+  edge: {
+    enc:["enc","plain"],  // user->router encrypted, router->pod plain
+    state:"TLS ends at the router · pod speaks HTTP",
+    note:"<strong>Edge.</strong> The router terminates TLS: HTTPS from the user, <span style='color:var(--red-ink);font-weight:700'>cleartext HTTP</span> from router to pod. The server certificate lives on the <strong>Route</strong>. Simplest option — good when the pod network is trusted.",
+    cmd:"oc create route edge selfcare \\\n  --service=self-care --hostname=selfcare.apps.<domain> \\\n  --cert=tls.crt --key=tls.key"
+  },
+  passthrough: {
+    enc:["enc","enc"],
+    state:"router never decrypts · pod owns TLS",
+    note:"<strong>Passthrough.</strong> The router forwards encrypted bytes untouched — it <em>never</em> sees plaintext. The <strong>pod</strong> terminates TLS and owns the cert. The only mode for <strong>mutual TLS</strong>/cert-pinning; no L7 path routing possible.",
+    cmd:"oc create route passthrough sms-gw \\\n  --service=sms-gateway --port=8443"
+  },
+  reencrypt: {
+    enc:["enc","enc2"],
+    state:"encrypted end-to-end · router still routes L7",
+    note:"<strong>Re-encrypt.</strong> Router decrypts (to route by host/path), then <strong>re-encrypts</strong> to the pod with an internal cert. Encrypted every hop <em>and</em> routable. Needs <code>--dest-ca-cert</code> so the router trusts the pod.",
+    cmd:"oc create route reencrypt billing \\\n  --service=billing-api --cert=tls.crt --key=tls.key \\\n  --dest-ca-cert=service-ca.crt"
+  }
+};
+function seg(label,sub){ return `<div class="node2">${label}<div class="sub">${sub}</div></div>`; }
+function link(kind){
+  if(kind==="enc") return `<div class="link enc"><span class="lock">🔒</span>HTTPS<br>encrypted</div>`;
+  if(kind==="enc2") return `<div class="link enc"><span class="lock">🔒</span>HTTPS<br>re-encrypted</div>`;
+  return `<div class="link plain"><span class="lock">🔓</span>HTTP<br>cleartext</div>`;
+}
+function renderMode(k){
+  const m=MODES[k];
+  document.getElementById("pipe").innerHTML=
+    `<div class="seg">${seg("🌍 User","browser")}</div>`+
+    `<div class="seg">${link(m.enc[0])}</div>`+
+    `<div class="seg">${seg("🔀 Router","HAProxy")}</div>`+
+    `<div class="seg">${link(m.enc[1])}</div>`+
+    `<div class="seg">${seg("📦 Pod","self-care")}</div>`;
+  document.getElementById("encState").textContent=m.state;
+  document.getElementById("encState").className="counter "+(m.enc[1]==="plain"?"":"match");
+  document.getElementById("modeNote").innerHTML=m.note;
+  document.getElementById("cmd").textContent=m.cmd;
+}
+const mm=document.getElementById("modes");
+["edge","passthrough","reencrypt"].forEach((k,i)=>{ const b=document.createElement("button"); b.className="btn ghost"; b.textContent=k;
+  b.addEventListener("click",()=>{ document.querySelectorAll("#modes .btn").forEach(x=>x.classList.remove("sel")); b.classList.add("sel"); renderMode(k); });
+  mm.appendChild(b); });
+document.querySelectorAll("#modes .btn")[0].classList.add("sel"); renderMode("edge");
+
+// --- Route vs Ingress ----------------------------------------------
+document.getElementById("useRoute").addEventListener("click",()=>{
+  document.getElementById("ingNote").innerHTML="<strong>Route (OpenShift-native).</strong> Full power: edge/passthrough/re-encrypt TLS, router sharding, per-route timeouts, traffic splitting. Not portable to vanilla Kubernetes. Prefer it for OpenShift-specific needs (esp. passthrough/re-encrypt).";
+});
+document.getElementById("useIngress").addEventListener("click",()=>{
+  document.getElementById("ingNote").innerHTML="<strong>Ingress (Kubernetes standard).</strong> Portable across any cluster — but on OpenShift the <strong>Ingress Operator auto-creates a Route</strong> to fulfil it, served by the same HAProxy router. No native passthrough. Prefer it when manifests must also run on plain Kubernetes.";
+});
+
+renderQuiz("quiz", [
+  { q: "In EDGE termination, how does traffic travel from the router to the pod?",
+    options: ["Encrypted HTTPS","Cleartext HTTP","It doesn't reach the pod","mTLS"], answer: 1,
+    explain: "Edge terminates TLS at the router: HTTPS to the user, cleartext HTTP router→pod. The cert lives on the Route. Fine when the pod network is trusted; not for end-to-end encryption." },
+  { q: "An SMS gateway must do mutual TLS (client certs) directly with a carrier. Which Route mode?",
+    options: ["edge","passthrough","re-encrypt","none — use HTTP"], answer: 1,
+    explain: "Passthrough is the only mode where the router never decrypts — the pod terminates TLS and can enforce mTLS/cert-pinning. The trade-off: no L7 (host/path) routing at the router." },
+  { q: "You need traffic encrypted on EVERY hop but the router must still route by hostname/path. Which mode?",
+    options: ["edge","passthrough","re-encrypt","NodePort"], answer: 2,
+    explain: "Re-encrypt decrypts at the router (so it can route L7) then re-encrypts to the pod — encrypted end-to-end AND routable. It needs --dest-ca-cert so the router trusts the pod's cert." },
+  { q: "You create a Kubernetes Ingress on OpenShift. What happens?",
+    options: ["It's rejected","The Ingress Operator generates a Route served by the same HAProxy router","A separate nginx controller starts","Nothing until you install Ingress"], answer: 1,
+    explain: "On OpenShift, Ingress and Route aren't rivals — the Ingress Operator fulfils an Ingress by creating a Route. Same router underneath. Routes add passthrough/re-encrypt/sharding on top." }
+]);
+</script>
+</body>
+</html>

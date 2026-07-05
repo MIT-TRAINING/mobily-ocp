@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Networking, Services &amp; DNS — Interactive | Module 6</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .flow { display:flex; flex-direction:column; gap:8px; }
+  .hop { border:2px solid var(--line); border-radius:11px; padding:11px 14px; display:flex; justify-content:space-between; align-items:center; gap:10px; transition:all .35s; }
+  .hop .net { font-size:11px; font-family:var(--mono); color:var(--ink-soft); }
+  .hop.active { box-shadow:var(--shadow); transform:scale(1.02); }
+  .hop.ext { border-color:var(--blue); } .hop.ext.active { background:var(--blue-bg); color:var(--blue-ink); }
+  .hop.node { border-color:var(--amber); } .hop.node.active { background:var(--amber-bg); color:var(--amber-ink); }
+  .hop.svc { border-color:var(--green); } .hop.svc.active { background:var(--green-bg); color:var(--green-ink); }
+  .hop.pod { border-color:var(--purple); } .hop.pod.active { background:var(--purple-bg); color:var(--purple-ink); }
+  .arrow { text-align:center; color:var(--muted); font-weight:800; font-size:13px; }
+  .eps { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .ep { width:120px; border:2px solid var(--green); background:var(--green-bg); color:var(--green-ink); border-radius:9px; padding:8px; text-align:center; font-size:11px; font-weight:700; cursor:pointer; transition:all .3s; }
+  .ep.down { border-color:var(--red); background:var(--red-bg); color:var(--red-ink); opacity:.55; }
+  .ep .hits { font-family:var(--mono); font-size:13px; margin-top:3px; }
+  .dnsbox { font-family:var(--mono); font-size:13px; background:var(--slate-bg); border-radius:9px; padding:10px 12px; margin-top:8px; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 6</a>
+  <span class="pill">Visualization 1 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · The cluster network</div>
+    <h1>One request, four networks.</h1>
+    <p class="lede">A subscriber hits the self-care portal. That request crosses <strong>four</strong> distinct networks before it reaches a pod. Trace it, watch <strong>CoreDNS</strong> resolve a Service, and see <strong>ClusterIP</strong> load-balance across healthy endpoints.</p>
+  </div>
+
+  <div class="card">
+    <h2>Follow the packet</h2>
+    <p class="sub">Click <strong>Send request</strong> to step through the path. Each hop is a different network.</p>
+    <div class="controls">
+      <button class="btn primary" id="send">▶ Send request</button>
+      <button class="btn ghost" id="resetF">Reset</button>
+    </div>
+    <div class="flow" id="flow" style="margin-top:10px">
+      <div class="hop ext" data-i="0"><span>🌍 <strong>External user</strong> → DNS → router IP</span><span class="net">external</span></div>
+      <div class="arrow">▼</div>
+      <div class="hop node" data-i="1"><span>🔀 <strong>Router (HAProxy)</strong> matches Route by hostname</span><span class="net">node network</span></div>
+      <div class="arrow">▼</div>
+      <div class="hop svc" data-i="2"><span>🟢 <strong>Service self-care</strong> (ClusterIP) load-balances</span><span class="net">service net · 172.30/16</span></div>
+      <div class="arrow">▼</div>
+      <div class="hop pod" data-i="3"><span>📦 <strong>Pod endpoint</strong> serves the response</span><span class="net">pod net · 10.128/14</span></div>
+    </div>
+    <div class="note" id="flowNote" style="margin-top:10px">Four address spaces: <strong>external</strong> (public DNS/LB), <strong>node</strong> (the RHCOS hosts + router), <strong>service</strong> (virtual ClusterIPs), <strong>pod</strong> (every pod's IP). Most connectivity bugs are "which network is the break on?"</div>
+  </div>
+
+  <div class="card">
+    <h2>DNS resolution</h2>
+    <p class="sub">Pick where the caller lives. In the same project you can use a short name; across projects you need the namespace.</p>
+    <div class="controls">
+      <button class="btn ghost" id="dnsSame">caller in <strong>team-billing</strong></button>
+      <button class="btn ghost" id="dnsOther">caller in <strong>team-crm</strong></button>
+    </div>
+    <div class="dnsbox" id="dnsBox">$ nslookup subscriber-api …</div>
+    <div class="note" id="dnsNote" style="margin-top:8px">Every Service gets <code>name.namespace.svc.cluster.local</code>. CoreDNS returns the Service's <strong>ClusterIP</strong>, not a pod IP — the ClusterIP is stable even as pods churn.</div>
+  </div>
+
+  <div class="card">
+    <h2>ClusterIP load-balancing across endpoints</h2>
+    <p class="sub">The Service fronts 3 pods. <strong>Click a pod</strong> to toggle its health — unhealthy pods leave the EndpointSlice and stop getting traffic. Then send traffic.</p>
+    <div class="controls">
+      <button class="btn primary" id="traffic">📨 Send 30 requests</button>
+      <button class="btn ghost" id="resetLB">Reset</button>
+    </div>
+    <div class="statebar">
+      <span class="counter match" id="cEps">healthy endpoints: 3/3</span>
+      <span class="counter" id="cTotal">requests sent: 0</span>
+    </div>
+    <div class="eps" id="eps"></div>
+    <div class="note" id="lbNote" style="margin-top:8px">Only <strong>Ready</strong> pods are in the EndpointSlice. The Service spreads requests across them — kill one and traffic rebalances to the survivors automatically.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="index.html">← All visualizations</a>
+    <a class="btn primary" href="02-routes-and-tls.html">Next: Routes &amp; TLS termination →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// --- Packet flow ---------------------------------------------------
+const NOTES=[
+  "<strong>External network.</strong> The subscriber's browser resolves <code>selfcare.apps.&lt;domain&gt;</code> via public/corp DNS to the <em>router's</em> address. Nothing cluster-internal is exposed yet.",
+  "<strong>Node network.</strong> The request lands on the <strong>Router (HAProxy)</strong> running on the cluster nodes. It matches the <strong>Route</strong> by hostname and picks the backing Service.",
+  "<strong>Service network (172.30/16).</strong> The Service is a <em>virtual</em> ClusterIP. It has no process — OVN-Kubernetes load-balances it to a healthy pod endpoint.",
+  "<strong>Pod network (10.128/14).</strong> The request finally reaches a real <strong>pod</strong> on its own IP. Response retraces the path. Four networks, one request."
+];
+let step=-1;
+function paintFlow(){ document.querySelectorAll(".hop").forEach(h=>h.classList.toggle("active", +h.dataset.i===step)); }
+document.getElementById("send").addEventListener("click",()=>{ step=(step+1)%4; paintFlow();
+  document.getElementById("flowNote").innerHTML=NOTES[step];
+  document.getElementById("send").textContent = step===3 ? "▶ Send again" : "▶ Next hop"; });
+document.getElementById("resetF").addEventListener("click",()=>{ step=-1; paintFlow();
+  document.getElementById("send").textContent="▶ Send request";
+  document.getElementById("flowNote").innerHTML="Four address spaces: <strong>external</strong> (public DNS/LB), <strong>node</strong> (the RHCOS hosts + router), <strong>service</strong> (virtual ClusterIPs), <strong>pod</strong> (every pod's IP). Most connectivity bugs are \"which network is the break on?\""; });
+
+// --- DNS -----------------------------------------------------------
+function dns(short){
+  const fqdn="subscriber-api.team-billing.svc.cluster.local";
+  const name = short ? "subscriber-api" : "subscriber-api.team-billing";
+  document.getElementById("dnsBox").innerHTML=
+    `$ nslookup ${name}<br>Name:&nbsp;&nbsp;&nbsp;${fqdn}<br>Address: 172.30.42.10 &nbsp;<span style="color:var(--muted)">(ClusterIP)</span>`;
+  document.getElementById("dnsNote").innerHTML= short
+    ? "Caller is in <strong>team-billing</strong> — the <em>same</em> project as the Service, so the short name <code>subscriber-api</code> resolves. Kubernetes DNS search-domains fill in the rest."
+    : "Caller is in <strong>team-crm</strong> — a <em>different</em> project. You must qualify with the namespace: <code>subscriber-api.team-billing</code>. This cross-namespace reach is exactly what a NetworkPolicy governs (Viz 03).";
+}
+document.getElementById("dnsSame").addEventListener("click",()=>dns(true));
+document.getElementById("dnsOther").addEventListener("click",()=>dns(false));
+dns(true);
+
+// --- Load balancing ------------------------------------------------
+let pods=[{n:"...a1",up:true,hits:0},{n:"...b2",up:true,hits:0},{n:"...c3",up:true,hits:0}], total=0;
+function renderLB(){
+  const el=document.getElementById("eps"); el.innerHTML="";
+  pods.forEach((p,i)=>{ const d=document.createElement("div"); d.className="ep"+(p.up?"":" down");
+    d.innerHTML=`📦 self-care-${p.n}<br>${p.up?"Ready":"NotReady"}<div class="hits">${p.hits} hits</div>`;
+    d.addEventListener("click",()=>{ p.up=!p.up; renderLB(); }); el.appendChild(d); });
+  const healthy=pods.filter(p=>p.up).length;
+  document.getElementById("cEps").textContent="healthy endpoints: "+healthy+"/3";
+  document.getElementById("cEps").className="counter "+(healthy>0?"match":"mismatch");
+  document.getElementById("cTotal").textContent="requests sent: "+total;
+}
+document.getElementById("traffic").addEventListener("click",()=>{
+  const up=pods.filter(p=>p.up); if(!up.length){ document.getElementById("lbNote").innerHTML="⚠️ <strong>No Ready endpoints</strong> — the Service has nothing to route to; callers get connection refused. Readiness is what gates a pod into the EndpointSlice."; return; }
+  for(let i=0;i<30;i++){ up[i%up.length].hits++; } total+=30; renderLB();
+  document.getElementById("lbNote").innerHTML="Traffic spread <strong>evenly across Ready pods only</strong>. Toggle one down and resend — the Service rebalances to the survivors with no config change. That's ClusterIP + EndpointSlice doing their job.";
+});
+document.getElementById("resetLB").addEventListener("click",()=>{ pods.forEach(p=>{p.up=true;p.hits=0;}); total=0; renderLB(); });
+renderLB();
+
+renderQuiz("quiz", [
+  { q: "Which four networks does a request cross from external user to pod?",
+    options: ["public, private, DMZ, backup","external, node, service, pod","http, https, tcp, udp","master, worker, infra, edge"], answer: 1,
+    explain: "External (public DNS/LB) → node (router/hosts) → service (virtual ClusterIP, 172.30/16) → pod (10.128/14). Localizing a connectivity bug means asking which of these the break is on." },
+  { q: "What does CoreDNS return when you resolve a ClusterIP Service name?",
+    options: ["A random pod's IP","The Service's stable ClusterIP","The router's public IP","The node's IP"], answer: 1,
+    explain: "DNS returns the Service ClusterIP — a stable virtual IP. OVN-Kubernetes then load-balances that ClusterIP to a healthy pod endpoint; pods can churn without the name/IP changing." },
+  { q: "A pod in team-crm wants to reach a Service in team-billing. Which name works?",
+    options: ["subscriber-api","subscriber-api.team-billing","subscriber-api.local","team-crm.subscriber-api"], answer: 1,
+    explain: "Short names only resolve within the same namespace. Across projects you must qualify with the namespace: subscriber-api.team-billing (full: ...svc.cluster.local)." },
+  { q: "You mark one of three backing pods NotReady. What happens to traffic?",
+    options: ["The Service goes down","It rebalances to the 2 Ready pods automatically","All requests fail","The ClusterIP changes"], answer: 1,
+    explain: "Only Ready pods are in the EndpointSlice, so the Service simply spreads traffic across the survivors — no config change. If ALL become NotReady, callers get connection refused." }
+]);
+</script>
+</body>
+</html>
