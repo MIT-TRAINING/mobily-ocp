@@ -748,5 +748,4 @@ walk you through each.
 > intentionally delivered as **4 focused visualizations + 4 exercises** covering all
 > seven topics (OpenShift vs Kubernetes & the stack/portfolio/history · RHCOS & CRI-O ·
 > Operators & Cluster Operators · Machine API & cluster architecture).
-</content>
 </invoke>

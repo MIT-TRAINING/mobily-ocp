@@ -86,19 +86,30 @@ https://api.ocp4.example.com:6443
 oc version
 ```
 
-**Expected output** *(requires a cluster — representative):*
+**Verified output** *(learner25 · a normal developer · 2026-07-05):*
 
 ```
 Client Version: 4.22.0
 Kustomize Version: v5.7.1
-Server Version: 4.18.20
-Kubernetes Version: v1.31.7
+Kubernetes Version: v1.31.14
 ```
 
-> **Narrate:** **Server Version 4.18.20** is the OpenShift product version — the one
-> that maps to docs, errata, and support cases. **Kubernetes Version v1.31.7** is the
-> upstream engine OpenShift 4.18 *embeds*. Same cluster, two numbers, different
-> audiences.
+**Expected output for a cluster-admin** (adds the OpenShift line):
+
+```
+Client Version: 4.22.0
+Kustomize Version: v5.7.1
+Server Version: 4.18.x
+Kubernetes Version: v1.31.14
+```
+
+> **Narrate:** **Kubernetes Version v1.31.14** is the upstream engine OpenShift 4.18
+> *embeds* — and it's all a **normal user sees**, because the **Server Version** (the
+> OpenShift product version) is derived from the `ClusterVersion`, which an unprivileged
+> user like `learner25` cannot read (verified: the line is simply omitted). A
+> **cluster-admin** sees both — the OpenShift version is the one you quote to Red Hat
+> support; the Kubernetes version is the embedded engine. Same cluster, two numbers,
+> different audiences.
 
 ---
 
@@ -218,9 +229,9 @@ project.project.openshift.io "mobily-mod4" deleted
 
 ---
 
-> **◐ Partially verified:** oc **4.22** (client) · 2026-06-29 — Step 1
-> (`oc version --client`) and the `oc explain` / `oc help` *syntax* were run live.
-> Steps 2–8 require a **live OpenShift cluster** and are **representative of OpenShift
-> 4.18**; run them on the shared cluster/Sandbox for your own values. No
-> cluster-dependent output is presented as independently verified.
-</content>
+> **◐ Verified as learner25 (2026-07-05):** on OpenShift 4.18 (k8s v1.31.14),
+> `oc whoami` (=`learner25`), `oc whoami --show-server`, `oc version` (Kubernetes line
+> only — see Step 3), `oc explain route.spec`, and `oc new-project`/`oc get pods` all ran
+> live and match. **Confirmed nuance:** a normal user's `oc version` omits the OpenShift
+> **Server Version** line (needs cluster read). The interactive `oc login`/console steps
+> depend on your credentials; substitute your own token/host.

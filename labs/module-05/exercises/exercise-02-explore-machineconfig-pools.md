@@ -135,4 +135,3 @@ freeze reboots during a sensitive window.
 > not runnable here. Output is **representative of OpenShift 4.18**; the YAML follows the
 > Ignition 3.4.0 schema. Run live for your real pool names and rendered hashes. Nothing
 > is presented as independently verified.
-</content>

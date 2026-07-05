@@ -119,4 +119,3 @@ right target, green after.
 > `--to=` upgrade is deliberately **not** part of this exercise. Output is
 > **representative of OpenShift 4.18** — run the report-only forms on the shared cluster
 > for real channel/target values. Nothing is presented as independently verified.
-</content>

@@ -166,4 +166,8 @@ real `--to=` upgrade on the class cluster).
 > would change the cluster (deliberately **not run**). Output is **representative of
 > OpenShift 4.18**; run the report-only forms (`oc adm upgrade`, channel reads) on the
 > shared cluster for real values. Nothing is presented as independently verified.
-</content>
+
+> **Gating validated (2026-07-05, as learner25):** the cluster-scope actions in this demo
+> returned `Error from server (Forbidden)` for the normal user **learner25** — confirming
+> it is correctly **cluster-admin / instructor-led**, as marked. Reproduce the live output
+> with an admin/cluster-reader login.

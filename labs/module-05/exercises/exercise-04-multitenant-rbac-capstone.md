@@ -158,4 +158,3 @@ lists holders of a permission. That's a clean, auditable tenant.
 > **require a live OpenShift cluster with cluster-admin** and were not run here. Output is
 > **representative of OpenShift 4.18** — run it live to capture your real bindings and
 > `can-i` results. Nothing cluster-dependent is presented as independently verified.
-</content>

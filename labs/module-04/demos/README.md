@@ -70,4 +70,3 @@ oc whoami --show-server         # which cluster
 > reads) is labelled **"requires a cluster — output is representative of OpenShift
 > 4.18"** and the demo footers say **◐ Partially verified**. No cluster-dependent
 > output here is presented as independently verified — run it live to capture your own.
-</content>

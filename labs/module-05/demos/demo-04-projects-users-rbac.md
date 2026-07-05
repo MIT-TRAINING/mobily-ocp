@@ -197,4 +197,11 @@ group.user.openshift.io "billing-admins" deleted
 > cluster state** (Steps 1–6) **requires a live OpenShift cluster with cluster-admin**
 > and was not run here. Output is **representative of OpenShift 4.18** — run it live for
 > your own values. Nothing cluster-dependent is presented as independently verified.
-</content>
+
+> **◐ Validated (2026-07-05, as learner25):** live findings on OpenShift 4.18 for a normal
+> user. **Works for a project self-provisioner:** `oc new-project` and — inside your *own*
+> project — `oc adm policy add-role-to-user <role> <user>` (a project-admin can bind roles;
+> `clusterrole/... added` succeeded). **Requires cluster-admin (returned `Forbidden`):**
+> `oc create resourcequota`, `oc adm groups new`, and `oc auth can-i ... --as <user>`
+> (impersonation). So the quota, group-creation, and `--as` verification steps are
+> instructor/admin-led; the project + role-binding steps a learner can run directly.

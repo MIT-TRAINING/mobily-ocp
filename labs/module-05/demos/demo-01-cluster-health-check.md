@@ -174,4 +174,8 @@ Step 5: `rm -rf /tmp/mg`).
 > **representative of a healthy OpenShift 4.18** cluster; run the commands live to
 > capture your real version, operator board, and node list. Syntax follows the
 > `oc`/`kubectl` 4.x reference; nothing is presented as independently verified.
-</content>
+
+> **Gating validated (2026-07-05, as learner25):** the cluster-scope actions in this demo
+> returned `Error from server (Forbidden)` for the normal user **learner25** — confirming
+> it is correctly **cluster-admin / instructor-led**, as marked. Reproduce the live output
+> with an admin/cluster-reader login.

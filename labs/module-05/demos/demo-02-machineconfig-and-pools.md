@@ -191,4 +191,8 @@ machineconfig.machineconfiguration.openshift.io "50-worker-mobily-corp-ca" delet
 > is **representative of OpenShift 4.18**; the MachineConfig YAML follows the Ignition
 > 3.4.0 schema but the CA blob is a placeholder — supply your own and run live. Nothing
 > is presented as independently verified.
-</content>
+
+> **Gating validated (2026-07-05, as learner25):** the cluster-scope actions in this demo
+> returned `Error from server (Forbidden)` for the normal user **learner25** — confirming
+> it is correctly **cluster-admin / instructor-led**, as marked. Reproduce the live output
+> with an admin/cluster-reader login.

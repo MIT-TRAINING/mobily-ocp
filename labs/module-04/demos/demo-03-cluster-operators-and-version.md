@@ -205,4 +205,10 @@ Nothing to clean up — this demo only **read** cluster state (we never ran an u
 > **representative of a healthy OpenShift 4.18** cluster; run the commands live to
 > capture your real operator board and available updates. Command syntax follows the
 > `oc` 4.x reference; nothing is presented as independently verified.
-</content>
+
+> **Gating validated (2026-07-05, as learner25):** every cluster-scope read in this demo
+> (`oc get nodes` / `clusteroperators` / `clusterversion` / `machines`) returned
+> `Error from server (Forbidden): ... at the cluster scope` for the normal user
+> **learner25** — confirming this demo is correctly **cluster-admin / instructor-led**, as
+> marked. The representative output above still requires an admin/cluster-reader login to
+> reproduce live.

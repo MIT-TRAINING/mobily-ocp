@@ -67,4 +67,3 @@ interactive [visualizations](../index.html), and the
 > **"requires a cluster — output is representative of OpenShift 4.18"**; run them on the
 > shared cluster or Sandbox to see your own values. No output here is fabricated as
 > "verified" without a real run.
-</content>

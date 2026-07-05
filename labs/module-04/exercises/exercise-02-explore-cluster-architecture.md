@@ -127,4 +127,3 @@ pods on workers unless they explicitly tolerate it.
 > shared cluster to capture your own node names, RHCOS build, and CRI-O version. The
 > command *syntax* follows the `oc`/`kubectl` 4.x reference; no output is presented as
 > independently verified.
-</content>

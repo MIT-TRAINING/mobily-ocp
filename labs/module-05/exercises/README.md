@@ -61,4 +61,3 @@ Companion material: the guided [demos](../demos/README.md), the interactive
 > **"requires a cluster — output is representative of OpenShift 4.18"**; run them on the
 > shared cluster/Sandbox for your own values. No cluster-dependent output is presented as
 > independently verified.
-</content>

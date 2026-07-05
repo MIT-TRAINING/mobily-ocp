@@ -638,4 +638,3 @@ flowchart LR
 > visualizations + 4 demos + 4 exercises** covering all six topics (installation models
 > & topology · cluster health · the MCO & MachineConfigPools · lifecycle/upgrades ·
 > Projects/quotas · users/groups/RBAC).
-</content>

@@ -137,4 +137,3 @@ DEGRADED column) point at the failing subsystem *before* you ever look at a pod.
 > healthy OpenShift 4.18** cluster; run the commands on the shared cluster to capture
 > your real operator board. Command syntax follows the `oc` 4.x reference; no output is
 > presented as independently verified.
-</content>

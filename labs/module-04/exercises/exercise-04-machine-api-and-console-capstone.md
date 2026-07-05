@@ -147,4 +147,3 @@ applications (Operators), the platform (Cluster Operators + CVO), and infrastruc
 > cluster**; run the commands on the shared cluster (scaling is admin-only) for your real
 > values. Command syntax follows the `oc` 4.x reference; no output is presented as
 > independently verified.
-</content>

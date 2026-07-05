@@ -65,4 +65,3 @@ oc auth can-i '*' '*' --all-namespaces   # 'yes' => cluster-admin (needed for De
 > **"requires a cluster — output is representative of OpenShift 4.18"** and demo footers
 > say **◐ Partially verified**. No cluster-dependent output is presented as
 > independently verified — run it live to capture your own.
-</content>

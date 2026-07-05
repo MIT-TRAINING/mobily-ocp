@@ -163,4 +163,3 @@ oc delete project mobily-mod4
 > OpenShift cluster (`Server Version`, `whoami`, `new-project`, `explain route`) are
 > **representative of OpenShift 4.18**; run them on the shared cluster/Sandbox for your
 > own values. Nothing is fabricated as fully verified.
-</content>

@@ -107,4 +107,3 @@ diagnose with `describe`/`events`/`adm top` first.
 > not runnable in the authoring environment. Output is **representative of a healthy
 > OpenShift 4.18** cluster; run live for your real values. Syntax follows the
 > `oc`/`kubectl` 4.x reference; nothing is presented as independently verified.
-</content>
