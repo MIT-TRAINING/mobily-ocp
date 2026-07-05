@@ -60,24 +60,26 @@ oc get svc subscriber-api -o jsonpath='{.spec.clusterIP}{"\n"}'
 <summary><strong>✅ Solution</strong> (try the tasks first)</summary>
 
 ```bash
-# 1. Deploy + expose (ClusterIP)
-oc new-app --name=subscriber-api registry.access.redhat.com/ubi9/httpd-24:latest
+# 1. Deploy + expose (ClusterIP) — use `oc create deployment`, NOT `oc new-app`
+#    (new-app auto-creates a Service, so `oc expose deployment` would fail)
+oc create deployment subscriber-api --image=registry.access.redhat.com/ubi9/httpd-24:latest
+oc rollout status deploy/subscriber-api
 oc expose deployment subscriber-api --port=8080
 
 # 2. ClusterIP, no external IP
-oc get svc subscriber-api      # TYPE=ClusterIP, EXTERNAL-IP=<none>, 8080/TCP
+oc get svc subscriber-api      # TYPE=ClusterIP, EXTERNAL-IP=<none>
 
 # 3. DNS + reach
 oc run tmp --rm -it --restart=Never --image=registry.access.redhat.com/ubi9/ubi-minimal -- \
   bash -c 'getent hosts subscriber-api; curl -s -o /dev/null -w "%{http_code}\n" subscriber-api:8080/'
 
-# 4. Endpoints
+# 4. Endpoints  (create-deployment labels pods app=<name>)
 oc get endpointslices -l kubernetes.io/service-name=subscriber-api
 
 # 5. Scale + churn; ClusterIP unchanged
-oc scale deployment subscriber-api --replicas=3
+oc scale deployment subscriber-api --replicas=3 && oc rollout status deploy/subscriber-api
 CIP=$(oc get svc subscriber-api -o jsonpath='{.spec.clusterIP}')
-POD=$(oc get pods -l deployment=subscriber-api -o jsonpath='{.items[0].metadata.name}')
+POD=$(oc get pods -l app=subscriber-api -o jsonpath='{.items[0].metadata.name}')
 oc delete pod "$POD"
 test "$CIP" = "$(oc get svc subscriber-api -o jsonpath='{.spec.clusterIP}')" && echo "ClusterIP stable: $CIP"
 
@@ -87,15 +89,15 @@ test "$CIP" = "$(oc get svc subscriber-api -o jsonpath='{.spec.clusterIP}')" && 
 oc delete all -l app=subscriber-api
 ```
 
-**Representative output** *(requires a cluster — OCP 4.18):*
+**Verified output** *(learner25 · OCP 4.18 · project `l25-m6d1`):*
 
 ```
-NAME             TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
-subscriber-api   ClusterIP   172.30.42.10   <none>        8080/TCP   6s
+NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)             AGE
+subscriber-api   ClusterIP   172.30.90.157   <none>        8080/TCP,8443/TCP   17s
 
-172.30.42.10   subscriber-api.mod6-ex.svc.cluster.local
+172.30.90.157   subscriber-api.l25-m6d1.svc.cluster.local
 403
-ClusterIP stable: 172.30.42.10
+ClusterIP stable: 172.30.90.157
 ```
 
 **Key point:** DNS returns the **ClusterIP** — a stable virtual IP that outlives any pod.
@@ -106,7 +108,8 @@ Cross-project, use `subscriber-api.<namespace>.svc.cluster.local`.
 
 ---
 
-> **◐ Partially verified:** every command **requires a live OpenShift cluster** and was
-> not runnable here (no cluster). Output is **representative of OpenShift 4.18**; the
-> `httpd-24` **403-on-/** and `svc.cluster.local` naming are real, documented behaviours.
-> Run live for your ClusterIP/pod IPs. Nothing is presented as independently verified.
+> **✅ Verified:** oc 4.22 · OpenShift 4.18 (k8s v1.31.14) · 2026-07-05 · **learner25**.
+> Every command ran live in project `l25-m6d1`: `oc create deployment`+`oc expose` (not
+> `oc new-app`, which pre-creates the Service), DNS → stable ClusterIP `172.30.90.157`,
+> `httpd-24` **403-on-/**, endpoints scale, and the ClusterIP survives pod deletion. The
+> `ubi9/httpd-24` Service lists `8080/TCP,8443/TCP` (image declares both).

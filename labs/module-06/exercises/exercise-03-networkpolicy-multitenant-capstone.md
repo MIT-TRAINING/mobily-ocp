@@ -76,13 +76,14 @@ oc get networkpolicy -n team-billing
 <summary><strong>✅ Solution</strong> (try the tasks first)</summary>
 
 ```bash
-# 1. Two tenants
+# 1. Two tenants  (use `oc create deployment` — labels pods app=<name>, and does not
+#    pre-create a Service, so `oc expose deployment` works)
 oc new-project team-billing 2>/dev/null || oc project team-billing
-oc new-app --name=subscriber-db  registry.access.redhat.com/ubi9/httpd-24:latest
+oc create deployment subscriber-db  --image=registry.access.redhat.com/ubi9/httpd-24:latest
 oc expose deployment subscriber-db --port=8080
-oc new-app --name=subscriber-api registry.access.redhat.com/ubi9/httpd-24:latest
+oc create deployment subscriber-api --image=registry.access.redhat.com/ubi9/httpd-24:latest
 oc new-project team-crm 2>/dev/null
-oc new-app --name=crm registry.access.redhat.com/ubi9/httpd-24:latest
+oc create deployment crm --image=registry.access.redhat.com/ubi9/httpd-24:latest
 
 # 2. Prove it's open (403 = reached)
 oc rsh -n team-crm deployment/crm curl -s --max-time 5 -o /dev/null \
@@ -115,10 +116,10 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata: { name: allow-api-to-db }
 spec:
-  podSelector: { matchLabels: { deployment: subscriber-db } }
+  podSelector: { matchLabels: { app: subscriber-db } }
   policyTypes: [Ingress]
   ingress:
-    - from: [ { podSelector: { matchLabels: { deployment: subscriber-api } } } ]
+    - from: [ { podSelector: { matchLabels: { app: subscriber-api } } } ]
       ports: [ { protocol: TCP, port: 8080 } ]
 EOF
 
@@ -136,19 +137,23 @@ oc delete networkpolicy --all -n team-billing ; oc delete all -l app -n team-bil
 oc delete project team-billing   # if throwaway
 ```
 
-**Representative output** *(requires a cluster with two projects — OCP 4.18):*
+**Verified output** *(learner25 · OCP 4.18 · projects `l25-billing` + `l25-crm`):*
 
 ```
-crm->db: 403                 # step 2: open by default (reached)
-crm->db: BLOCKED             # step 3: default-deny drops it
-api->db: 403                 # step 6: sanctioned path allowed
-crm->db: BLOCKED             # step 6: cross-tenant still denied
+crm->db (no policy): 403     # step 2: open by default (reached)
+crm->db: 000 / exit 28       # step 3: default-deny drops it (curl timeout = BLOCKED)
+api->db (allowed?): 403      # step 6: sanctioned path allowed
+crm->db: 000 / BLOCKED       # step 6: cross-tenant still denied
 
-NAME                   POD-SELECTOR              AGE
-allow-api-to-db        deployment=subscriber-db  1m
-allow-from-ingress     <none>                    2m
-default-deny-ingress   <none>                    3m
+NAME                   POD-SELECTOR        AGE
+allow-api-to-db        app=subscriber-db   13s
+allow-from-ingress     <none>              24s
+default-deny-ingress   <none>              33s
 ```
+
+> Bonus (verified): with `allow-from-ingress` present, a Route to a billing app returns
+> **403** (router reaches the pod); delete that policy and the same Route returns **503**
+> (default-deny blocks the router).
 
 **Key point:** the pod network is **open by default** — the CRM pod reached billing until
 a **default-deny** selected the billing pods. NetworkPolicies are **additive allow-only**:
@@ -160,8 +165,8 @@ tenant boundary.
 
 ---
 
-> **◐ Partially verified:** every command **requires a live OpenShift cluster** (two
-> projects; OVN-Kubernetes enforcing policy) and was not runnable here. Output is
-> **representative of OpenShift 4.18**; the NetworkPolicy YAML is schema-correct and the
-> `httpd-24` **403** / default-deny **timeout** are real, documented behaviours. Run live
-> for your own results. Nothing is presented as independently verified.
+> **✅ Verified:** oc 4.22 · OpenShift 4.18 (k8s v1.31.14) · 2026-07-05 · **learner25**
+> (normal developer) across projects `l25-billing` + `l25-crm`. Ran live: open-by-default
+> (**403**), default-deny (**curl 000 / timeout**), `allow-api-to-db` with **`app=`**
+> selectors (api→db **403**, crm→db **blocked**), and the `allow-from-ingress` router path
+> (**403** with it, **503** without). Cross-tenant isolation confirmed end-to-end.

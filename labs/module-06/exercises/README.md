@@ -33,7 +33,8 @@ Kubernetes; **Routes** are OpenShift-specific.
 oc login https://api.<cluster-domain>:6443 -u <user> -p "$OCP_PASSWORD"   # or token
 oc whoami
 oc new-project mod6-ex --display-name="Module 6 Exercises" 2>/dev/null || oc project mod6-ex
-oc get ingresses.config/cluster -o jsonpath='{.spec.domain}{"\n"}'        # your *.apps domain
+# Your *.apps domain (a normal user cannot read ingresses.config/cluster) — read it off a
+# Route's HOST once you create one: everything after the first dot is the apps domain.
 ```
 
 - Images: **`ubi9/httpd-24`** serves HTTP on **8080** (doc-root `/var/www/html`; run its
@@ -58,9 +59,9 @@ Companion material: the guided [demos](../demos/README.md), the interactive
 
 ---
 
-> **◐ Partially verified.** `oc create route edge|passthrough|reencrypt --help` /
-> `oc expose --help` were run live with **oc 4.22** (client-side). Commands that need a
-> **live OpenShift cluster** (Services/Routes/NetworkPolicies, `curl` via router, DNS
-> lookups) are labelled **"requires a cluster — output is representative of OpenShift
-> 4.18"**; run them on the shared cluster/Sandbox for your own values. No cluster-dependent
-> output is presented as independently verified.
+> **✅ Verified on cluster (2026-07-05, as learner25).** Exercises 1–3 were validated live
+> on OpenShift 4.18 (k8s v1.31.14) as **learner25**, a normal developer/self-provisioner —
+> Services & DNS, Routes & edge TLS, and NetworkPolicy tenant isolation all reproduce the
+> output shown. Two corrections applied from that run: use **`oc create deployment`** (not
+> `oc new-app`, which pre-creates a Service), and NetworkPolicy selectors use **`app=`**
+> labels. Passthrough/re-encrypt Routes remain representative (need HTTPS backend + certs).
