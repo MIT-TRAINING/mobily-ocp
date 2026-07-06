@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Authentication &amp; OAuth — Interactive | Module 8</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .flow { display:flex; flex-direction:column; gap:8px; }
+  .hop { border:2px solid var(--line); border-radius:11px; padding:11px 14px; transition:all .35s; }
+  .hop.active { box-shadow:var(--shadow); transform:scale(1.02); }
+  .hop.a1.active { border-color:var(--blue); background:var(--blue-bg); color:var(--blue-ink); }
+  .hop.a2.active { border-color:var(--purple); background:var(--purple-bg); color:var(--purple-ink); }
+  .hop.a3.active { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); }
+  .hop.a4.active { border-color:var(--amber); background:var(--amber-bg); color:var(--amber-ink); }
+  .arrow { text-align:center; color:var(--muted); font-weight:800; }
+  .idps { display:flex; gap:8px; flex-wrap:wrap; } .idps .btn { flex:1 1 120px; } .idps .btn.sel { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .steps { counter-reset:s; display:flex; flex-direction:column; gap:8px; }
+  .step { border:2px solid var(--line); border-radius:10px; padding:9px 12px; font-size:13px; }
+  .step code { font-size:12px; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 8</a>
+  <span class="pill">Visualization 2 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Authentication</div>
+    <h1>OpenShift doesn't store your password. It asks an identity provider.</h1>
+    <p class="lede">The <strong>OAuth server</strong> handles logins but delegates the credential check to a configured <strong>identity provider</strong>. Follow a login end-to-end, compare IdP types, then wire up an <strong>htpasswd</strong> provider.</p>
+  </div>
+
+  <div class="card">
+    <h2>The login flow</h2>
+    <p class="sub">Step through what happens when a Mobily engineer runs <code>oc login</code>.</p>
+    <div class="controls">
+      <button class="btn primary" id="step">▶ Start login</button>
+      <button class="btn ghost" id="resetF">Reset</button>
+    </div>
+    <div class="flow" id="flow" style="margin-top:10px">
+      <div class="hop a1" data-i="0">🔑 <strong>oc login -u m.hassan</strong> — request hits the cluster</div>
+      <div class="arrow">▼</div>
+      <div class="hop a2" data-i="1">🛡️ <strong>OAuth server</strong> — doesn't check the password itself; routes to an IdP</div>
+      <div class="arrow">▼</div>
+      <div class="hop a3" data-i="2">🗂️ <strong>Identity Provider</strong> — verifies credentials (htpasswd / LDAP / OIDC)</div>
+      <div class="arrow">▼</div>
+      <div class="hop a4" data-i="3">🎫 <strong>Token issued</strong> — <code>User</code> + <code>Identity</code> objects created on first login</div>
+    </div>
+    <div class="note" id="flowNote" style="margin-top:10px">OpenShift has <strong>no built-in human user database</strong>. The OAuth server (the <code>authentication</code> Cluster Operator) delegates to whatever IdPs you configure in the <code>OAuth</code> resource.</div>
+  </div>
+
+  <div class="card">
+    <h2>Identity provider types</h2>
+    <div class="idps" id="idps"></div>
+    <div class="note" id="idpNote" style="margin-top:8px">Pick a provider type.</div>
+  </div>
+
+  <div class="card">
+    <h2>Wire up htpasswd (the lab/break-glass IdP)</h2>
+    <div class="steps">
+      <div class="step">1 · Build the file (bcrypt): <code>htpasswd -c -B -b users.htpasswd alice '&lt;pw&gt;'</code></div>
+      <div class="step">2 · Store as a Secret: <code>oc create secret generic mobily-htpasswd --from-file=htpasswd=users.htpasswd -n openshift-config</code></div>
+      <div class="step">3 · Add an htpasswd entry to <code>oc edit oauth cluster</code> (references the Secret)</div>
+      <div class="step">4 · Wait for the OAuth Operator to roll out, then <code>oc login -u alice</code></div>
+      <div class="step">5 · Grant access — <code>oc adm policy add-role-to-user edit alice -n team-billing</code> (authn ≠ authz!)</div>
+    </div>
+    <div class="note warn" style="margin-top:8px">A brand-new user can log in but can do <strong>nothing</strong> until a Role is bound. And keep one htpasswd admin as <strong>break-glass</strong> even after wiring LDAP — then remove <code>kubeadmin</code>.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="01-rbac-least-privilege.html">← RBAC &amp; Least Privilege</a>
+    <a class="btn primary" href="03-identity-integration.html">Next: LDAP / AD / OIDC &amp; Group Sync →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const NOTES=[
+  "<strong>oc login.</strong> The client sends the login request to the cluster's OAuth endpoint — no password is stored on the OpenShift side.",
+  "<strong>OAuth server.</strong> The <code>authentication</code> Cluster Operator runs the login server. It does <em>not</em> verify the password itself — it hands off to a configured identity provider.",
+  "<strong>Identity Provider.</strong> The configured IdP (htpasswd file, LDAP/AD directory, or OIDC provider) actually checks the credentials and returns the result.",
+  "<strong>Token + objects.</strong> On success a token is issued and, on first login, a <code>User</code> and an <code>Identity</code> (idp:username link) are created. RBAC then decides what this user may do — which starts at <em>nothing</em>."
+];
+let step=-1;
+function paint(){ document.querySelectorAll(".hop").forEach(h=>h.classList.toggle("active", +h.dataset.i===step)); }
+document.getElementById("step").addEventListener("click",()=>{ step=(step+1)%4; paint();
+  document.getElementById("flowNote").innerHTML=NOTES[step];
+  document.getElementById("step").textContent = step===3?"▶ Log in again":"▶ Next step"; });
+document.getElementById("resetF").addEventListener("click",()=>{ step=-1; paint();
+  document.getElementById("step").textContent="▶ Start login";
+  document.getElementById("flowNote").innerHTML="OpenShift has <strong>no built-in human user database</strong>. The OAuth server (the <code>authentication</code> Cluster Operator) delegates to whatever IdPs you configure in the <code>OAuth</code> resource."; });
+
+const IDP={
+  htpasswd:"<strong>htpasswd.</strong> A flat file of usernames + bcrypt hashes in a Secret. No external system — ideal for <strong>labs, small clusters, and break-glass</strong> accounts. Doesn't scale and has no group source.",
+  LDAP:"<strong>LDAP / Active Directory.</strong> Authenticate against your corporate directory via a bind + search. AD speaks LDAP (match <code>sAMAccountName</code>). Users authenticate here; groups come via a separate <em>sync</em> step.",
+  OIDC:"<strong>OpenID Connect.</strong> Delegate to a token-issuing provider (Entra ID, Okta, Keycloak). Enables <strong>SSO and MFA</strong>; group membership can ride inside the token's claims — no separate sync needed.",
+  GitHub:"<strong>GitHub / Google / GitLab.</strong> Social/enterprise OAuth logins — handy for developer-facing or SaaS-adjacent clusters; org/team membership can gate access."
+};
+const el=document.getElementById("idps");
+["htpasswd","LDAP","OIDC","GitHub"].forEach((k,i)=>{ const b=document.createElement("button"); b.className="btn ghost"; b.textContent=k;
+  b.addEventListener("click",()=>{ document.querySelectorAll("#idps .btn").forEach(x=>x.classList.remove("sel")); b.classList.add("sel"); document.getElementById("idpNote").innerHTML=IDP[k]; });
+  el.appendChild(b); });
+document.querySelectorAll("#idps .btn")[0].classList.add("sel"); document.getElementById("idpNote").innerHTML=IDP.htpasswd;
+
+renderQuiz("quiz", [
+  { q: "Where does OpenShift store human users' passwords?",
+    options: ["In etcd as User objects","In a ConfigMap","In each user's kubeconfig","Nowhere — it delegates the check to an identity provider"], answer: 3,
+    explain: "OpenShift has no built-in human password store. The OAuth server delegates credential verification to a configured IdP (htpasswd/LDAP/OIDC). User/Identity objects hold metadata, not passwords." },
+  { q: "A user logs in successfully for the first time. What does OpenShift create?",
+    options: ["User and Identity objects","A ClusterRoleBinding","A ServiceAccount","A Secret with their password"], answer: 0,
+    explain: "First login creates a User (the OpenShift account) and an Identity (the idp:username link). No permissions are attached yet — that's RBAC's job." },
+  { q: "A brand-new user authenticates via htpasswd. What can they do?",
+    options: ["Full cluster-admin","Edit in every project","Nothing until a Role is bound to them","Only create projects"], answer: 2,
+    explain: "Authentication ≠ authorization. A freshly-authenticated user has zero permissions until you bind a Role (e.g. `oc adm policy add-role-to-user edit alice -n team-billing`)." },
+  { q: "Which IdP is best for a small lab or a break-glass account with no external system?",
+    options: ["htpasswd","LDAP","OpenID Connect","Active Directory"], answer: 0,
+    explain: "htpasswd needs no external system — a bcrypt file in a Secret. Great for labs and break-glass. For enterprise scale and groups, use LDAP/AD or OIDC." }
+]);
+</script>
+</body>
+</html>

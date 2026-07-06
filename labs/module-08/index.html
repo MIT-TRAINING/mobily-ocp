@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 8 — Interactive Visualizations | OpenShift Container Platform</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift Container Platform</a>
+  <span class="pill">Module 8 · Authentication, RBAC &amp; Identity</span>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Interactive lab · Self-paced</div>
+    <h1>Authentication, RBAC &amp; identity — visualized</h1>
+    <p class="lede">Three hands-on visualizations that make Module 8 click — how <strong>RBAC</strong> combines Roles and bindings into least-privilege access (and how to prove it with <code>can-i</code>), how the <strong>OAuth server</strong> authenticates users through <strong>identity providers</strong> like htpasswd, and how <strong>LDAP / Active Directory / OIDC</strong> and <strong>group sync</strong> wire your corporate directory into cluster access. Each ends with a short <strong>self-check</strong> quiz.</p>
+  </div>
+
+  <div class="card">
+    <h2>How to use this</h2>
+    <p class="sub" style="margin:0">Work through the three in order (each builds on the last) or jump to any concept. Everything runs in your browser — no install, no internet, no cluster needed. Companion reading: <a href="../../guides/module-08-authentication-rbac-identity.md"><code>guides/module-08-authentication-rbac-identity.md</code></a>. Then practice for real with the guided <a href="demos/README.md">demos</a> and <a href="exercises/README.md">exercises</a> using <code>oc</code> on the shared OpenShift 4.18 cluster (IdP config is admin-led).</p>
+  </div>
+
+  <div class="viz-grid">
+    <a class="viz-card" href="01-rbac-least-privilege.html">
+      <span class="ix">01</span>
+      <h3>RBAC &amp; Least Privilege</h3>
+      <p>Combine <strong>Roles</strong> and <strong>bindings</strong>, build a rule from <strong>apiGroups × resources × verbs</strong>, and run a live <code>can-i</code> matrix across Mobily personas — never more access than needed.</p>
+      <div class="tags"><span class="tag">Role/Binding</span><span class="tag">verbs</span><span class="tag">least privilege</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="02-authentication-oauth.html">
+      <span class="ix">02</span>
+      <h3>Authentication &amp; OAuth</h3>
+      <p>Follow a login through the <strong>OAuth server</strong> to an <strong>identity provider</strong>, watch <strong>User/Identity</strong> objects appear, and wire up an <strong>htpasswd</strong> IdP step by step.</p>
+      <div class="tags"><span class="tag">OAuth</span><span class="tag">IdP</span><span class="tag">htpasswd</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="03-identity-integration.html">
+      <span class="ix">03</span>
+      <h3>LDAP / AD / OIDC &amp; Group Sync</h3>
+      <p>Compare <strong>LDAP</strong>, <strong>Active Directory</strong> and <strong>OIDC</strong> integration, then run <strong>group sync</strong> and watch directory groups become OpenShift Groups that drive <strong>RBAC</strong>.</p>
+      <div class="tags"><span class="tag">LDAP/AD</span><span class="tag">OIDC</span><span class="tag">group sync</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="01-rbac-least-privilege.html" style="border-style:dashed;background:var(--surface-2)">
+      <span class="ix">▶</span>
+      <h3>Start here</h3>
+      <p>New to OpenShift auth &amp; RBAC? Begin with visualization 01 and work straight through. ~20–30 minutes total.</p>
+      <div class="tags"><span class="tag">12 questions total</span></div>
+    </a>
+  </div>
+
+  <div class="card" style="margin-top:24px">
+    <h3 style="margin-top:0">What you'll be able to explain afterwards</h3>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li>The four RBAC objects (Role/ClusterRole × RoleBinding/ClusterRoleBinding) and when to use each</li>
+      <li>How a rule is built from <strong>apiGroups × resources × verbs</strong>, and how to author a <strong>custom Role</strong></li>
+      <li>How to <strong>design least-privilege</strong> access — default roles, bind to groups, project scope, verify with <code>can-i</code></li>
+      <li>How the <strong>OAuth server</strong> + an <strong>identity provider</strong> authenticate users, and how htpasswd works</li>
+      <li>How <strong>LDAP/AD</strong> and <strong>OIDC</strong> integrate, and how <strong>group sync</strong> maps the directory onto RBAC</li>
+    </ul>
+  </div>
+
+  <div class="card" style="margin-top:6px">
+    <h3 style="margin-top:0">Then take it to a real cluster</h3>
+    <p class="sub" style="margin:0 0 6px">The visualizations build the mental model; these apply it on a real OpenShift cluster with <code>oc</code> (shared 4.18 cluster; IdP/group-sync config is admin-led):</p>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li><a href="demos/README.md"><strong>Guided demos</strong></a> — instructor-led tours (custom RBAC, htpasswd IdP, LDAP/OIDC &amp; group sync).</li>
+      <li><a href="exercises/README.md"><strong>Exercises</strong></a> — you drive, with validation steps and worked solutions, building to a least-privilege access-model capstone.</li>
+      <li><a href="../../guides/module-08-authentication-rbac-identity.md"><strong>Concept guide</strong></a> — the deep-dive reference for every object here.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

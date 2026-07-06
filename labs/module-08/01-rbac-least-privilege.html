@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RBAC &amp; Least Privilege — Interactive | Module 8</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .seg-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+  .seg-row .btn { flex:1 1 150px; } .seg-row .btn.sel { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .chip { border:2px solid var(--line); border-radius:999px; padding:4px 11px; font-size:12px; font-weight:700; cursor:pointer; font-family:var(--mono); }
+  .chip.on { border-color:var(--blue); background:var(--blue-bg); color:var(--blue-ink); }
+  .yaml { font-family:var(--mono); font-size:12.5px; background:var(--slate-bg); border-radius:9px; padding:10px 12px; white-space:pre-wrap; }
+  table.m { width:100%; border-collapse:collapse; font-size:13px; }
+  table.m th, table.m td { padding:6px 8px; border-bottom:1px solid var(--line); text-align:center; }
+  table.m th:first-child, table.m td:first-child { text-align:left; font-weight:700; }
+  .y { color:var(--green-ink); font-weight:800; } .n { color:var(--red-ink); font-weight:800; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 8</a>
+  <span class="pill">Visualization 1 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Authorization</div>
+    <h1>Permissions are a set of rules. Bindings decide who gets them.</h1>
+    <p class="lede">RBAC is four objects on two axes: a <strong>Role/ClusterRole</strong> (what) bound by a <strong>RoleBinding/ClusterRoleBinding</strong> (who + where). Build the scope, author a rule, then prove least privilege with a live <code>can-i</code> matrix.</p>
+  </div>
+
+  <div class="card">
+    <h2>Pick the scope</h2>
+    <p class="sub">Choose a permission type and a binding type — see what access results.</p>
+    <div class="seg-row" id="roleType">
+      <button class="btn ghost" data-v="Role">Role (namespaced)</button>
+      <button class="btn ghost" data-v="ClusterRole">ClusterRole (reusable)</button>
+    </div>
+    <div class="seg-row" id="bindType">
+      <button class="btn ghost" data-v="RoleBinding">RoleBinding (one project)</button>
+      <button class="btn ghost" data-v="ClusterRoleBinding">ClusterRoleBinding (cluster-wide)</button>
+    </div>
+    <div class="statebar"><span class="counter" id="scopeState"></span></div>
+    <div class="note" id="scopeNote" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Build a rule: apiGroups × resources × verbs</h2>
+    <p class="sub">Toggle chips to compose a custom Role rule. Read-only? Pick only get/list/watch.</p>
+    <div style="margin:6px 0 4px;font-size:12px;color:var(--muted)">apiGroup</div>
+    <div class="chips" id="apiG"></div>
+    <div style="margin:8px 0 4px;font-size:12px;color:var(--muted)">resources</div>
+    <div class="chips" id="res"></div>
+    <div style="margin:8px 0 4px;font-size:12px;color:var(--muted)">verbs</div>
+    <div class="chips" id="verbs"></div>
+    <div class="yaml" id="ruleYaml" style="margin-top:10px"></div>
+    <div class="note" id="ruleNote" style="margin-top:8px">Rules are <strong>additive</strong> — there is no "deny". Access is the union of every rule in every Role bound to you.</div>
+  </div>
+
+  <div class="card">
+    <h2>Least privilege: the <code>can-i</code> matrix</h2>
+    <p class="sub">Each Mobily persona has the <em>minimum</em> role. Green = allowed, red = denied.</p>
+    <table class="m" id="matrix"></table>
+    <div class="note" style="margin-top:8px">Bind roles to <strong>groups</strong>, scope with <strong>RoleBindings</strong> where possible, and grant the <strong>smallest</strong> role that works. The auditor is cluster-wide but <em>read-only</em>; only the platform SRE can delete.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="index.html">← All visualizations</a>
+    <a class="btn primary" href="02-authentication-oauth.html">Next: Authentication &amp; OAuth →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// --- Scope ---------------------------------------------------------
+let roleType="Role", bindType="RoleBinding";
+function segInit(id, setter){
+  document.querySelectorAll("#"+id+" .btn").forEach(b=>b.addEventListener("click",()=>{
+    document.querySelectorAll("#"+id+" .btn").forEach(x=>x.classList.remove("sel")); b.classList.add("sel");
+    setter(b.dataset.v); renderScope();
+  }));
+}
+segInit("roleType", v=>roleType=v); segInit("bindType", v=>bindType=v);
+function renderScope(){
+  let valid=true, txt, note;
+  if(roleType==="Role" && bindType==="ClusterRoleBinding"){
+    valid=false; txt="✗ invalid combination";
+    note="A <strong>ClusterRoleBinding can only reference a ClusterRole</strong>, never a namespaced Role. Use a ClusterRole for cluster-wide grants.";
+  } else if(roleType==="Role" && bindType==="RoleBinding"){
+    txt="custom, project-scoped permission";
+    note="<strong>Role + RoleBinding</strong> — a custom permission that applies only in that Role's namespace. The everyday way to grant a bespoke, project-scoped right.";
+  } else if(roleType==="ClusterRole" && bindType==="RoleBinding"){
+    txt="reuse a cluster-defined role in ONE project";
+    note="<strong>ClusterRole + RoleBinding</strong> — reuse a cluster-wide permission set (like <code>edit</code>) in a single project. This is exactly how <code>admin</code>/<code>edit</code>/<code>view</code> are granted per-project.";
+  } else {
+    txt="cluster-wide grant (every namespace)";
+    note="<strong>ClusterRole + ClusterRoleBinding</strong> — grants the permission across the <em>whole cluster</em>. Powerful; use sparingly (auditors' read-all, platform admins).";
+  }
+  const c=document.getElementById("scopeState");
+  c.textContent=roleType+" + "+bindType+" → "+txt; c.className="counter "+(valid?"match":"mismatch");
+  document.getElementById("scopeNote").innerHTML=note;
+}
+document.querySelector('#roleType .btn[data-v="Role"]').classList.add("sel");
+document.querySelector('#bindType .btn[data-v="RoleBinding"]').classList.add("sel");
+renderScope();
+
+// --- Rule builder --------------------------------------------------
+const G={ apiG:['""  (core)','apps','route.openshift.io'], res:['pods','pods/log','deployments','secrets','routes'], verbs:['get','list','watch','create','update','delete'] };
+const sel={ apiG:new Set(['""  (core)']), res:new Set(['pods','pods/log']), verbs:new Set(['get','list','watch']) };
+function chips(id,key){
+  const el=document.getElementById(id); el.innerHTML="";
+  G[key].forEach(v=>{ const d=document.createElement("div"); d.className="chip"+(sel[key].has(v)?" on":""); d.textContent=v;
+    d.addEventListener("click",()=>{ sel[key].has(v)?sel[key].delete(v):sel[key].add(v); chips(id,key); renderRule(); }); el.appendChild(d); });
+}
+function renderRule(){
+  const ag=[...sel.apiG].map(x=>x.startsWith('""')?'""':`"${x}"`).join(", ");
+  const rs=[...sel.res].map(x=>`"${x}"`).join(", ");
+  const vb=[...sel.verbs].map(x=>`"${x}"`).join(", ");
+  document.getElementById("ruleYaml").textContent =
+    `kind: Role   # namespaced\nmetadata: { namespace: team-billing, name: custom-role }\nrules:\n  - apiGroups: [${ag||'""'}]\n    resources: [${rs||'""'}]\n    verbs: [${vb||'""'}]`;
+  const writes=["create","update","delete","patch"].some(w=>sel.verbs.has(w));
+  document.getElementById("ruleNote").innerHTML = writes
+    ? "This rule grants <strong>write</strong> access — beyond read. Give write only where a persona truly needs it (least privilege)."
+    : "Read-only rule (<code>get/list/watch</code>). Note the console needs both <code>get</code> AND <code>list</code>. Rules are additive; there is no deny.";
+}
+chips("apiG","apiG"); chips("res","res"); chips("verbs","verbs"); renderRule();
+
+// --- can-i matrix --------------------------------------------------
+// personas with their role; actions computed
+const ACTIONS=[["view pods (team-billing)","read","team-billing"],["deploy (team-billing)","write","team-billing"],["read pods (team-crm)","read","team-crm"],["read nodes (cluster)","read","cluster"],["delete project","admin","cluster"]];
+const PERSONAS=[
+  {n:"billing-dev (edit @team-billing)", allow:(a)=>a[2]==="team-billing"&&(a[1]==="read"||a[1]==="write")},
+  {n:"noc-viewer (view @all app ns)", allow:(a)=>a[1]==="read"&&(a[2]==="team-billing"||a[2]==="team-crm")},
+  {n:"auditor (cluster-reader)", allow:(a)=>a[1]==="read"},
+  {n:"platform-sre (cluster-admin)", allow:(a)=>true}
+];
+function renderMatrix(){
+  const t=document.getElementById("matrix");
+  let head="<tr><th>persona \\ action</th>"+ACTIONS.map(a=>`<th>${a[0]}</th>`).join("")+"</tr>";
+  let rows=PERSONAS.map(p=>{
+    return `<tr><td>${p.n}</td>`+ACTIONS.map(a=>{ const ok=p.allow(a); return `<td class="${ok?'y':'n'}">${ok?'yes':'no'}</td>`; }).join("")+"</tr>";
+  }).join("");
+  t.innerHTML=head+rows;
+}
+renderMatrix();
+
+renderQuiz("quiz", [
+  { q: "Which combination grants a custom, project-scoped permission?",
+    options: ["Role + RoleBinding","ClusterRole + ClusterRoleBinding","Role + ClusterRoleBinding","a ClusterRole on its own"], answer: 0,
+    explain: "A namespaced Role bound by a RoleBinding grants a bespoke permission within that one project. (Role + ClusterRoleBinding is invalid; a Role/ClusterRole does nothing until bound.)" },
+  { q: "In a rule, what does apiGroups: [\"\"] (the empty string) refer to?",
+    options: ["Every API group","No API group at all","The core API group (pods, services, secrets, PVCs)","Only custom resources"], answer: 2,
+    explain: "The empty string is the core group — pods, services, configmaps, secrets, PVCs. Named groups like apps or route.openshift.io are listed explicitly." },
+  { q: "You want the billing team to have 'edit' in ONLY their project. How?",
+    options: ["A ClusterRoleBinding of the edit ClusterRole","Create a brand-new ClusterRole","Edit each pod's securityContext","A RoleBinding of the edit ClusterRole in team-billing"], answer: 3,
+    explain: "Bind the existing 'edit' ClusterRole with a RoleBinding scoped to team-billing — that's how per-project admin/edit/view work. A ClusterRoleBinding would grant it everywhere." },
+  { q: "RBAC rules are additive with no 'deny'. How do you reduce someone's access?",
+    options: ["Add a deny rule","Set a binding priority","Remove the grant/binding that provides it","Restart the API server"], answer: 2,
+    explain: "There is no deny rule — access is the union of all bound rules. To take access away you remove the RoleBinding (or the rule) that grants it." }
+]);
+</script>
+</body>
+</html>

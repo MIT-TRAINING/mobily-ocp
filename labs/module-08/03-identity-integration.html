@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LDAP / AD / OIDC &amp; Group Sync — Interactive | Module 8</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .idps { display:flex; gap:8px; flex-wrap:wrap; } .idps .btn { flex:1 1 130px; } .idps .btn.sel { background:var(--blue); color:#fff; border-color:var(--blue); }
+  table.cmp { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; }
+  table.cmp th, table.cmp td { padding:7px 9px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  table.cmp th { color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.03em; }
+  .sync { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; margin:10px 0; }
+  .box { border:2px solid var(--line); border-radius:11px; padding:10px 12px; text-align:center; min-width:130px; transition:all .35s; background:var(--surface-2); }
+  .box.on { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); }
+  .box .t { font-weight:800; font-size:12.5px; } .box .s { font-size:10.5px; color:var(--ink-soft); margin-top:2px; }
+  .arrow { color:var(--muted); font-weight:800; }
+  .members { font-family:var(--mono); font-size:12px; margin-top:8px; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 8</a>
+  <span class="pill">Visualization 3 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Enterprise identity</div>
+    <h1>Wire the corporate directory into cluster access.</h1>
+    <p class="lede">Authenticate real staff against <strong>LDAP</strong>, <strong>Active Directory</strong>, or <strong>OIDC</strong> — then <strong>sync groups</strong> so directory membership drives RBAC. Compare the integrations, then run a group sync end-to-end.</p>
+  </div>
+
+  <div class="card">
+    <h2>Compare the integrations</h2>
+    <div class="idps" id="idps"></div>
+    <div class="note" id="idpNote" style="margin-top:8px"></div>
+    <table class="cmp" id="cmp"></table>
+  </div>
+
+  <div class="card">
+    <h2>Group sync: directory → OpenShift Groups → RBAC</h2>
+    <p class="sub">Run the sync and watch AD groups become OpenShift Groups that a single RoleBinding turns into access for the whole team.</p>
+    <div class="controls">
+      <button class="btn primary" id="sync">▶ oc adm groups sync --confirm</button>
+      <button class="btn ghost" id="bind" disabled>🔗 add-role-to-group edit billing-devs</button>
+      <button class="btn ghost" id="resetS">Reset</button>
+    </div>
+    <div class="sync" id="syncFlow">
+      <div class="box" id="bAD"><div class="t">AD group</div><div class="s">CN=billing-devs</div></div>
+      <span class="arrow">→</span>
+      <div class="box" id="bOG"><div class="t">OpenShift Group</div><div class="s" id="ogState">not synced</div></div>
+      <span class="arrow">→</span>
+      <div class="box" id="bRB"><div class="t">RoleBinding</div><div class="s" id="rbState">no access</div></div>
+    </div>
+    <div class="members" id="members">members: m.hassan, a.khan, s.ali  (from Active Directory)</div>
+    <div class="statebar"><span class="counter" id="syncState">not synced</span></div>
+    <div class="note" id="syncNote" style="margin-top:8px">Run <code>oc adm groups sync</code> on a <strong>schedule</strong> (a CronJob) so joiners and leavers in AD propagate automatically. Then bind roles to the <strong>group</strong> — membership changes flow to access with no OpenShift edits.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="02-authentication-oauth.html">← Authentication &amp; OAuth</a>
+    <a class="btn primary" href="index.html">Done — back to all visualizations →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// --- Compare -------------------------------------------------------
+const IDP={
+  LDAP:{ note:"<strong>LDAP.</strong> OpenShift binds to an LDAP server (OpenLDAP/389-DS) with a service account and <em>searches</em> for the user. Match the username on <code>uid</code>. Groups come via a separate sync step.",
+    rows:[["Match attribute","uid"],["How groups arrive","separate oc adm groups sync"],["Transport","ldaps:// (TLS)"],["Best for","OpenLDAP directories"]] },
+  AD:{ note:"<strong>Active Directory.</strong> AD speaks LDAP, so it uses the <em>LDAP</em> provider — match on <code>sAMAccountName</code> (or <code>userPrincipalName</code>). Membership sits on the user's <code>memberOf</code>; still synced separately.",
+    rows:[["Match attribute","sAMAccountName"],["How groups arrive","group sync (memberOf)"],["Transport","ldaps:// (TLS)"],["Best for","Microsoft AD estates"]] },
+  OIDC:{ note:"<strong>OpenID Connect.</strong> Delegate to a token-issuing provider (Entra ID, Okta, Keycloak). Enables SSO + MFA; group membership can be delivered <em>inside the token's claims</em> — often no separate sync.",
+    rows:[["Match attribute","preferredUsername claim"],["How groups arrive","groups claim in the token"],["Transport","HTTPS + OIDC discovery"],["Best for","SSO/MFA, modern IdPs"]] }
+};
+const el=document.getElementById("idps");
+["LDAP","AD","OIDC"].forEach((k,i)=>{ const b=document.createElement("button"); b.className="btn ghost"; b.textContent=k;
+  b.addEventListener("click",()=>{ document.querySelectorAll("#idps .btn").forEach(x=>x.classList.remove("sel")); b.classList.add("sel"); renderCmp(k); });
+  el.appendChild(b); });
+function renderCmp(k){
+  document.getElementById("idpNote").innerHTML=IDP[k].note;
+  document.getElementById("cmp").innerHTML="<tr><th>Aspect</th><th>"+k+"</th></tr>"+
+    IDP[k].rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+}
+document.querySelectorAll("#idps .btn")[0].classList.add("sel"); renderCmp("LDAP");
+
+// --- Group sync ----------------------------------------------------
+let synced=false, bound=false;
+function renderSync(){
+  document.getElementById("bAD").classList.add("on");
+  document.getElementById("bOG").classList.toggle("on",synced);
+  document.getElementById("ogState").textContent = synced? "billing-devs (3 members)" : "not synced";
+  document.getElementById("bRB").classList.toggle("on",bound);
+  document.getElementById("rbState").textContent = bound? "edit @ team-billing" : "no access";
+  const s=document.getElementById("syncState");
+  s.textContent = bound? "team has edit access ✓" : synced? "synced (no binding yet)" : "not synced";
+  s.className="counter "+(bound?"match":synced?"mismatch":"");
+  document.getElementById("bind").disabled = !synced || bound;
+}
+document.getElementById("sync").addEventListener("click",()=>{ synced=true; renderSync();
+  document.getElementById("syncNote").innerHTML="<strong>Synced.</strong> <code>oc adm groups sync</code> read the directory and created an OpenShift Group <code>billing-devs</code> with the same members. But a synced group has <em>no access yet</em> — bind a role to it.";
+});
+document.getElementById("bind").addEventListener("click",()=>{ if(!synced) return; bound=true; renderSync();
+  document.getElementById("syncNote").innerHTML="<strong>Access granted to the group.</strong> All three members now have <code>edit</code> in <code>team-billing</code>. Add someone to <code>billing-devs</code> in AD → after the next scheduled sync they inherit it automatically. One source of truth, full audit trail.";
+});
+document.getElementById("resetS").addEventListener("click",()=>{ synced=false; bound=false; renderSync();
+  document.getElementById("syncNote").innerHTML="Run <code>oc adm groups sync</code> on a <strong>schedule</strong> (a CronJob) so joiners and leavers in AD propagate automatically. Then bind roles to the <strong>group</strong> — membership changes flow to access with no OpenShift edits.";
+});
+renderSync();
+
+renderQuiz("quiz", [
+  { q: "Active Directory integrates with OpenShift using which identity provider?",
+    options: ["The OIDC provider only","A dedicated 'ActiveDirectory' provider","The LDAP provider (AD speaks LDAP; match sAMAccountName)","htpasswd"], answer: 2,
+    explain: "There's no separate AD provider — AD is LDAP-compatible, so you use the LDAP IdP and match the username on sAMAccountName (or userPrincipalName)." },
+  { q: "With LDAP/AD integration, how do corporate groups become OpenShift Groups?",
+    options: ["Automatically on every login","They can't — LDAP has no groups","Manually, one user at a time, forever","Via `oc adm groups sync`, ideally on a schedule"], answer: 3,
+    explain: "The LDAP IdP authenticates users but doesn't create Groups. `oc adm groups sync` mirrors directory groups into OpenShift Groups; run it on a CronJob so membership stays current." },
+  { q: "A key advantage of OIDC over LDAP for group membership is…",
+    options: ["Group membership can be delivered inside the token's claims (no separate sync)","It needs no client secret","It stores passwords inside OpenShift","It requires no identity provider at all"], answer: 0,
+    explain: "OIDC providers can include a groups claim in the ID token, so OpenShift learns membership at login — often removing the separate group-sync step LDAP needs." },
+  { q: "After syncing groups, how do you grant a whole team access to a project?",
+    options: ["Add each user to a RoleBinding individually","Give everyone cluster-admin","Edit each pod","Bind a role to the GROUP (oc adm policy add-role-to-group)"], answer: 3,
+    explain: "Bind the role to the synced group once; every member inherits it, and future joiners/leavers flow through the next sync. Binding per-user defeats the purpose." }
+]);
+</script>
+</body>
+</html>
