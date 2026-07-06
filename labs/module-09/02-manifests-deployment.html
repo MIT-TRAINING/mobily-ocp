@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes Manifests — Interactive | Module 9</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--red-bg); color:var(--red-ink); }
+  .term { font-family:var(--mono); font-size:12.5px; background:#1e2530; color:#d5dae2; border-radius:9px; padding:10px 12px; white-space:pre-wrap; min-height:60px; }
+  .term .ok2 { color:#7ee0a2; } .term .err { color:#ff9d9d; } .term .dim { color:#8b93a1; }
+  .over { display:flex; gap:8px; flex-wrap:wrap; } .over .btn { flex:1 1 130px; } .over .btn.sel { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .yaml { font-family:var(--mono); font-size:12.5px; background:var(--slate-bg); border-radius:9px; padding:10px 12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 9</a>
+  <span class="pill">Visualization 2 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Declarative YAML</div>
+    <h1>Declare it in YAML. Apply it. Repeat safely.</h1>
+    <p class="lede">A <strong>manifest</strong> describes desired objects; <code>oc apply</code> reconciles the cluster to match — <strong>idempotently</strong>. See why <code>apply</code> beats <code>create</code>, then use <strong>Kustomize</strong> to patch one base into per-environment overlays.</p>
+  </div>
+
+  <div class="card">
+    <h2><code>apply</code> vs <code>create</code>: run it twice</h2>
+    <p class="sub">Click each command twice and watch what happens the second time.</p>
+    <div class="controls">
+      <button class="btn ghost" id="runCreate">$ oc create -f deploy.yaml</button>
+      <button class="btn primary" id="runApply">$ oc apply -f deploy.yaml</button>
+      <button class="btn ghost" id="resetT">Reset</button>
+    </div>
+    <div class="term" id="term"><span class="dim"># run a command above…</span></div>
+    <div class="statebar"><span class="counter" id="tState">clean</span></div>
+    <div class="note" id="tNote" style="margin-top:8px"><strong>apply</strong> is create-or-update and <strong>idempotent</strong> — re-running is always safe, which is why GitOps uses it. <strong>create</strong> errors if the object already exists.</div>
+  </div>
+
+  <div class="card">
+    <h2>Kustomize: one base, many overlays</h2>
+    <p class="sub">A <strong>base</strong> plus small per-environment <strong>patches</strong> — no templating. Pick an overlay to render.</p>
+    <div class="over" id="overlays"></div>
+    <div class="yaml" id="rendered" style="margin-top:10px"></div>
+    <div class="note" id="kNote" style="margin-top:8px">Pick an overlay. <code>oc apply -k overlays/&lt;env&gt;</code> builds the base + patch and applies it; <code>oc kustomize</code> just renders it.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="01-operators-olm.html">← Operators &amp; OLM</a>
+    <a class="btn primary" href="03-helm-charts.html">Next: Helm Charts &amp; Releases →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// --- apply vs create ----------------------------------------------
+let exists=false;
+function setState(){ const s=document.getElementById("tState"); s.textContent = exists?"deployment exists":"clean"; s.className="counter "+(exists?"match":""); }
+document.getElementById("runCreate").addEventListener("click",()=>{
+  const t=document.getElementById("term");
+  if(!exists){ exists=true; t.innerHTML='$ oc create -f deploy.yaml\n<span class="ok2">deployment.apps/subscriber-api created</span>';
+    document.getElementById("tNote").innerHTML="First <code>create</code> succeeded. Now click it <strong>again</strong> — create fails on an existing object.";
+  } else { t.innerHTML='$ oc create -f deploy.yaml\n<span class="err">Error from server (AlreadyExists): deployments.apps "subscriber-api" already exists</span>';
+    document.getElementById("tNote").innerHTML="🔴 <strong>create</strong> errors on re-run (<code>AlreadyExists</code>) — not safe to repeat. This is why pipelines use <code>apply</code>.";
+    document.getElementById("tState").className="counter mismatch"; document.getElementById("tState").textContent="create failed";
+  }
+  setState();
+});
+document.getElementById("runApply").addEventListener("click",()=>{
+  const t=document.getElementById("term");
+  if(!exists){ exists=true; t.innerHTML='$ oc apply -f deploy.yaml\n<span class="ok2">deployment.apps/subscriber-api created</span>';
+    document.getElementById("tNote").innerHTML="<code>apply</code> created it. Click <strong>again</strong> — apply is idempotent (no error, reports unchanged/configured).";
+  } else { t.innerHTML='$ oc apply -f deploy.yaml\n<span class="ok2">deployment.apps/subscriber-api unchanged</span>';
+    document.getElementById("tNote").innerHTML="✅ <strong>apply</strong> re-runs safely — <em>unchanged</em> now, or <em>configured</em> if the YAML changed. Idempotent = GitOps-friendly.";
+  }
+  setState();
+});
+document.getElementById("resetT").addEventListener("click",()=>{ exists=false; setState();
+  document.getElementById("term").innerHTML='<span class="dim"># run a command above…</span>';
+  document.getElementById("tNote").innerHTML="<strong>apply</strong> is create-or-update and <strong>idempotent</strong> — re-running is always safe, which is why GitOps uses it. <strong>create</strong> errors if the object already exists.";
+});
+setState();
+
+// --- Kustomize -----------------------------------------------------
+const OV={
+  base:{ r:2, img:"ubi9/httpd-24:latest", note:"The <strong>base</strong> — the common manifest every environment shares. Overlays patch it." },
+  dev:{ r:1, img:"ubi9/httpd-24:latest", note:"<strong>dev overlay</strong> patches <code>replicas: 1</code> — cheap. Everything else inherited from base." },
+  prod:{ r:6, img:"ubi9/httpd-24:1.0-prod", note:"<strong>prod overlay</strong> patches <code>replicas: 6</code> and a pinned prod image tag. One base, two tiny patches — no copy-paste, no templating." }
+};
+const el=document.getElementById("overlays");
+["base","dev","prod"].forEach((k,i)=>{ const b=document.createElement("button"); b.className="btn ghost"; b.textContent = k==="base"?"base":("overlay: "+k);
+  b.addEventListener("click",()=>{ el.querySelectorAll(".btn").forEach(x=>x.classList.remove("sel")); b.classList.add("sel"); renderOv(k); }); el.appendChild(b); });
+function renderOv(k){
+  const o=OV[k];
+  document.getElementById("rendered").textContent =
+    `# oc kustomize overlays/${k==="base"?"..":k}\nkind: Deployment\nmetadata: { name: subscriber-api }\nspec:\n  replicas: ${o.r}\n  template:\n    spec:\n      containers:\n        - image: registry.access.redhat.com/${o.img}`;
+  document.getElementById("kNote").innerHTML=o.note;
+}
+document.querySelectorAll("#overlays .btn")[0].classList.add("sel"); renderOv("base");
+
+renderQuiz("quiz", [
+  { q: "Why prefer `oc apply` over `oc create` for GitOps pipelines?",
+    options: ["apply runs faster than create","apply is idempotent — create-or-update, so re-running is always safe","create can't read YAML files","apply skips schema validation"], answer: 1,
+    explain: "apply reconciles to the desired state whether or not the object exists, so a pipeline can re-run harmlessly. create errors on an existing object." },
+  { q: "What does Kustomize let you do?",
+    options: ["Template YAML with {{ }} placeholders","Install and version Helm charts","Patch one base with per-environment overlays — no templating","Run Operators from OperatorHub"], answer: 2,
+    explain: "Kustomize (oc apply -k) layers small patches (replicas, image tag) over a shared base — declarative, no template language. Helm is the templating alternative." },
+  { q: "You run `oc create -f deploy.yaml` twice. The second run…",
+    options: ["Updates the deployment in place","Does nothing","Creates a second deployment","Errors with AlreadyExists"], answer: 3,
+    explain: "create fails on an object that already exists (AlreadyExists). Use apply for repeatable, idempotent runs." },
+  { q: "How do you scaffold a valid manifest to edit — without a cluster?",
+    options: ["oc create <res> --dry-run=client -o yaml","oc get all -o yaml","helm template ./chart","oc apply --server-side"], answer: 0,
+    explain: "`oc create ... --dry-run=client -o yaml` renders a valid manifest locally (no cluster contact) that you edit and commit. --server-side and get need a cluster." }
+]);
+</script>
+</body>
+</html>

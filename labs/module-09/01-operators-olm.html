@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operators &amp; OLM — Interactive | Module 9</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .flow { display:flex; flex-direction:column; gap:6px; }
+  .hop { border:2px solid var(--line); border-radius:11px; padding:10px 13px; transition:all .35s; font-size:13.5px; }
+  .hop.done { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); }
+  .hop.active { box-shadow:var(--shadow); transform:scale(1.02); border-color:var(--purple); background:var(--purple-bg); color:var(--purple-ink); }
+  .arrow { text-align:center; color:var(--muted); font-weight:800; font-size:12px; }
+  .opts { display:flex; gap:8px; flex-wrap:wrap; } .opts .btn { flex:1 1 130px; } .opts .btn.sel { background:var(--blue); color:#fff; border-color:var(--blue); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 9</a>
+  <span class="pill">Visualization 1 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Operators via OLM</div>
+    <h1>Install software that operates itself.</h1>
+    <p class="lede">For complex, stateful software you don't hand-roll manifests — you install an <strong>Operator</strong> from <strong>OperatorHub</strong>. The <strong>Operator Lifecycle Manager</strong> turns your <strong>Subscription</strong> into a running Operator, and you deploy by creating a <strong>Custom Resource</strong>.</p>
+  </div>
+
+  <div class="card">
+    <h2>Install flow: OperatorHub → running Operator</h2>
+    <p class="sub">Pick a channel &amp; approval mode, then step through what OLM creates.</p>
+    <div class="opts" id="channel" style="margin-bottom:6px"></div>
+    <div class="opts" id="approval"></div>
+    <div class="controls" style="margin-top:10px">
+      <button class="btn primary" id="step">▶ Start install</button>
+      <button class="btn ghost" id="reset">Reset</button>
+    </div>
+    <div class="flow" id="flow" style="margin-top:10px">
+      <div class="hop" data-i="0">🛍️ <strong>OperatorHub</strong> — pick the PostgreSQL Operator</div>
+      <div class="arrow">▼</div>
+      <div class="hop" data-i="1">📝 <strong>Subscription</strong> — package + channel + approval (+ OperatorGroup for scope)</div>
+      <div class="arrow">▼</div>
+      <div class="hop" data-i="2">📋 <strong>InstallPlan</strong> — the concrete plan OLM will execute</div>
+      <div class="arrow">▼</div>
+      <div class="hop" data-i="3">📦 <strong>CSV</strong> — the installed Operator (version + CRDs + RBAC), PHASE=Succeeded</div>
+      <div class="arrow">▼</div>
+      <div class="hop" data-i="4">🤖 <strong>Operator pod running</strong> — watches its Custom Resources</div>
+    </div>
+    <div class="statebar"><span class="counter" id="state">not installed</span></div>
+    <div class="note" id="note" style="margin-top:8px">OLM is the package manager for Operators — it handles discovery, install, dependency resolution and upgrades. OperatorHub is its catalog front-end.</div>
+  </div>
+
+  <div class="card">
+    <h2>Then use it: create a Custom Resource</h2>
+    <p class="sub">The Operator added CRDs to the API. You declare <em>what you want</em>; it builds &amp; operates it.</p>
+    <div class="note"><code>kind: PostgresCluster<br>metadata: { name: cdr-store }<br>spec: { instances: 3, backups: { schedule: "0 2 * * *" } }</code></div>
+    <div class="note ok" style="margin-top:8px">→ The Operator provisions a StatefulSet + PVCs + Services and runs <strong>nightly backups &amp; failover</strong> forever. You wrote ~5 lines, not a database's worth of YAML.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="index.html">← All visualizations</a>
+    <a class="btn primary" href="02-manifests-deployment.html">Next: Kubernetes Manifests →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+function seg(id,items,def){ const el=document.getElementById(id); el.innerHTML="";
+  items.forEach((t,i)=>{ const b=document.createElement("button"); b.className="btn ghost"+(i===def?" sel":""); b.textContent=t;
+    b.addEventListener("click",()=>{ el.querySelectorAll(".btn").forEach(x=>x.classList.remove("sel")); b.classList.add("sel"); updateApprovalNote(); }); el.appendChild(b); }); }
+seg("channel",["channel: stable","channel: fast"],0);
+seg("approval",["approval: Automatic","approval: Manual"],0);
+function approvalManual(){ return document.querySelectorAll("#approval .btn")[1].classList.contains("sel"); }
+function updateApprovalNote(){
+  if(step>=0) return;
+  document.getElementById("note").innerHTML = approvalManual()
+    ? "<strong>Manual approval:</strong> an admin must approve each InstallPlan before OLM installs/upgrades — safer for production."
+    : "<strong>Automatic approval:</strong> OLM installs and upgrades as new versions land in the chosen channel — convenient, less control.";
+}
+const NOTES=[
+  "<strong>OperatorHub.</strong> The catalog (Red Hat / Certified / Community / Marketplace). You pick an Operator and its options.",
+  "<strong>Subscription.</strong> Your request: which package, which <em>channel</em>, and the approval mode. An OperatorGroup sets the namespace scope (all vs one).",
+  "<strong>InstallPlan.</strong> OLM computes the concrete plan. In <em>Manual</em> mode this waits for an admin to approve; in <em>Automatic</em> it proceeds.",
+  "<strong>CSV (ClusterServiceVersion).</strong> The installed Operator's manifest — its version, deployment, the CRDs it owns, and RBAC. <code>oc get csv</code> shows PHASE=Succeeded when healthy.",
+  "<strong>Operator running.</strong> Its pod watches for Custom Resources. Its CRDs now exist in the API — you're ready to deploy software by creating a CR."
+];
+let step=-1;
+function paint(){ document.querySelectorAll(".hop").forEach(h=>{ const i=+h.dataset.i; h.classList.toggle("active",i===step); h.classList.toggle("done",i<step); }); }
+document.getElementById("step").addEventListener("click",()=>{
+  if(step<4){ step++; paint(); document.getElementById("note").innerHTML=NOTES[step];
+    const s=document.getElementById("state");
+    if(step<4){ s.textContent="installing… ("+["hub","subscription","installplan","csv"][step]+")"; s.className="counter mismatch"; }
+    else { s.textContent="Operator ready ✓ (CSV Succeeded)"; s.className="counter match"; }
+    document.getElementById("step").textContent = step>=4?"✓ installed":"▶ Next step";
+    if(step===2 && approvalManual()) document.getElementById("note").innerHTML="<strong>InstallPlan pending approval.</strong> Manual mode → an admin runs <code>oc get installplan</code> and patches <code>approved: true</code> before OLM proceeds.";
+  }
+});
+document.getElementById("reset").addEventListener("click",()=>{ step=-1; paint();
+  document.getElementById("state").textContent="not installed"; document.getElementById("state").className="counter";
+  document.getElementById("step").textContent="▶ Start install"; updateApprovalNote();
+});
+updateApprovalNote();
+
+renderQuiz("quiz", [
+  { q: "What does the Operator Lifecycle Manager (OLM) do?",
+    options: ["Installs, updates, and manages Operators","Builds container images from source","Replaces the Kubernetes scheduler","Stores application Secrets"], answer: 0,
+    explain: "OLM is the package manager for Operators — discovery, install, dependency resolution, and upgrades. OperatorHub is its catalog front-end." },
+  { q: "Installing an Operator from OperatorHub creates which object representing your request?",
+    options: ["A Deployment","A Subscription","A Route","A PersistentVolumeClaim"], answer: 1,
+    explain: "A Subscription declares the package, channel, and approval mode. OLM then produces an InstallPlan and a CSV (the installed Operator)." },
+  { q: "In Manual approval mode, what must an admin do for each new Operator version?",
+    options: ["Recreate the Subscription","Delete the CSV","Approve the InstallPlan","Restart OLM"], answer: 2,
+    explain: "Manual approval pauses at the InstallPlan; an admin approves it before OLM installs/upgrades. Automatic mode proceeds without waiting." },
+  { q: "Once an Operator is installed, how do you deploy the software it manages?",
+    options: ["Run helm install","Run oc new-app","Edit the CSV directly","Create a Custom Resource of the Operator's CRD"], answer: 3,
+    explain: "You declare a CR (e.g. kind: PostgresCluster, spec.instances: 3); the Operator reconciles it into the real objects and operates them day-2." }
+]);
+</script>
+</body>
+</html>

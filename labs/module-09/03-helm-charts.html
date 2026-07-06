@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Helm Charts &amp; Releases — Interactive | Module 9</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:820px){ .cols { grid-template-columns:1fr; } }
+  .yaml { font-family:var(--mono); font-size:12px; background:var(--slate-bg); border-radius:9px; padding:10px 12px; white-space:pre-wrap; }
+  .hist { display:flex; flex-direction:column; gap:5px; }
+  .rev { display:flex; justify-content:space-between; border:2px solid var(--line); border-radius:8px; padding:6px 10px; font-family:var(--mono); font-size:12px; }
+  .rev.cur { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); }
+  .rev.superseded { color:var(--muted); }
+  .toggle { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border:2px solid var(--line); border-radius:8px; font-size:12.5px; cursor:pointer; }
+  .toggle.on { border-color:var(--blue); background:var(--blue-bg); color:var(--blue-ink); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 9</a>
+  <span class="pill">Visualization 3 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Helm</div>
+    <h1>One chart. Many releases.</h1>
+    <p class="lede">A Helm <strong>chart</strong> is a template + <strong>values</strong>. Change the values and the same chart renders a different deployment; install it and you get a named <strong>release</strong> with a revision history you can upgrade and roll back.</p>
+  </div>
+
+  <div class="card">
+    <h2>Chart + values → rendered manifest</h2>
+    <p class="sub">Adjust the values; watch <code>helm template</code> re-render the deployment (real Helm behaviour).</p>
+    <div class="cols">
+      <div>
+        <div class="slider-row"><label><code>replicaCount</code></label><input type="range" id="rc" min="1" max="6" value="1"><span class="val" id="rcVal">1</span></div>
+        <div style="margin-top:8px">
+          <span class="toggle" id="imgToggle"><input type="checkbox" id="imgChk"> override image → UBI httpd-24</span>
+        </div>
+        <div class="note" style="margin-top:10px">Defaults come from <code>values.yaml</code> (the scaffold ships <code>replicaCount: 1</code>, image <code>nginx</code>). Your changes simulate <code>--set</code>.</div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">rendered (helm template):</div>
+        <div class="yaml" id="rendered"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Release lifecycle: install → upgrade → rollback</h2>
+    <p class="sub">Each action records a revision. Roll back to any prior one (it's saved as a new revision).</p>
+    <div class="controls">
+      <button class="btn primary" id="install">helm install self-care</button>
+      <button class="btn" id="upgrade" disabled>helm upgrade (replicas=5)</button>
+      <button class="btn red" id="rollback" disabled>helm rollback self-care 1</button>
+      <button class="btn ghost" id="resetR">Reset</button>
+    </div>
+    <div class="statebar"><span class="counter" id="relState">no release</span></div>
+    <div class="hist" id="hist" style="margin-top:10px"></div>
+    <div class="note" id="relNote" style="margin-top:8px">Helm stores each release revision (as Secrets in the namespace). <code>helm history</code> lists them; <code>helm rollback &lt;name&gt; &lt;rev&gt;</code> reverts — as a <em>new</em> revision, so history is preserved.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="02-manifests-deployment.html">← Kubernetes Manifests</a>
+    <a class="btn primary" href="index.html">Done — back to all visualizations →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// --- render ---------------------------------------------------------
+function renderTmpl(){
+  const rc=document.getElementById("rc").value;
+  const ubi=document.getElementById("imgChk").checked;
+  const img = ubi ? "registry.access.redhat.com/ubi9/httpd-24:latest" : "nginx:1.16.0";
+  document.getElementById("rendered").textContent =
+    `# Source: subscriber-api/templates/deployment.yaml\nkind: Deployment\nspec:\n  replicas: ${rc}\n  template:\n    spec:\n      containers:\n        - name: subscriber-api\n          image: "${img}"`;
+}
+document.getElementById("rc").addEventListener("input",e=>{ document.getElementById("rcVal").textContent=e.target.value; renderTmpl(); });
+document.getElementById("imgChk").addEventListener("change",e=>{ document.getElementById("imgToggle").classList.toggle("on",e.target.checked); renderTmpl(); });
+renderTmpl();
+
+// --- lifecycle ------------------------------------------------------
+let revs=[]; // {n, desc, status}
+function renderHist(){
+  const el=document.getElementById("hist"); el.innerHTML="";
+  if(!revs.length){ el.innerHTML='<div class="rev">no revisions yet — install to begin</div>'; }
+  revs.forEach((r,i)=>{ const cur=i===revs.length-1; const d=document.createElement("div");
+    d.className="rev "+(cur?"cur":"superseded");
+    d.innerHTML=`<span>rev ${r.n} · ${r.desc}</span><span>${cur?"deployed":"superseded"}</span>`; el.appendChild(d); });
+  const s=document.getElementById("relState");
+  s.textContent = revs.length? ("self-care · rev "+revs[revs.length-1].n+" deployed") : "no release";
+  s.className="counter "+(revs.length?"match":"");
+  document.getElementById("upgrade").disabled = !revs.length;
+  document.getElementById("rollback").disabled = revs.length<2;
+}
+document.getElementById("install").addEventListener("click",()=>{
+  if(revs.length) return; revs=[{n:1,desc:"install (replicas=2)"}]; renderHist();
+  document.getElementById("relNote").innerHTML="<code>helm install self-care ./subscriber-api</code> → <strong>revision 1</strong>. A named release now exists; <code>helm list</code> shows it.";
+});
+document.getElementById("upgrade").addEventListener("click",()=>{
+  if(!revs.length) return; revs.push({n:revs.length+1,desc:"upgrade (replicas=5)"}); renderHist();
+  document.getElementById("relNote").innerHTML="<code>helm upgrade self-care ...</code> → <strong>revision "+revs.length+"</strong> with new values. The old revision is kept (superseded).";
+});
+document.getElementById("rollback").addEventListener("click",()=>{
+  if(revs.length<2) return; revs.push({n:revs.length+1,desc:"rollback to rev 1"}); renderHist();
+  document.getElementById("relNote").innerHTML="<code>helm rollback self-care 1</code> → recorded as <strong>revision "+revs.length+"</strong> (a copy of rev 1). Nothing is lost — history is append-only. Use <code>--atomic</code> on upgrade to auto-roll-back failures.";
+});
+document.getElementById("resetR").addEventListener("click",()=>{ revs=[]; renderHist();
+  document.getElementById("relNote").innerHTML="Helm stores each release revision (as Secrets in the namespace). <code>helm history</code> lists them; <code>helm rollback &lt;name&gt; &lt;rev&gt;</code> reverts — as a <em>new</em> revision, so history is preserved.";
+});
+renderHist();
+
+renderQuiz("quiz", [
+  { q: "In Helm, what is a 'release'?",
+    options: ["A version of a chart","A values file","A named installation of a chart, with revision history","A container image tag"], answer: 2,
+    explain: "Installing a chart with a name creates a release; Helm tracks its revisions so you can upgrade and roll back. The chart is the package; the release is one install of it." },
+  { q: "Which command renders a chart to manifests WITHOUT contacting a cluster?",
+    options: ["helm install","helm upgrade","oc apply","helm template"], answer: 3,
+    explain: "helm template renders locally — ideal for review, diffing, and CI. install/upgrade talk to the cluster; oc apply needs one too." },
+  { q: "Values override precedence — which wins?",
+    options: ["--set on the CLI beats a -f values file, which beats chart defaults","The chart's values.yaml always wins","A -f file always beats --set","Values can't be combined"], answer: 0,
+    explain: "More specific / later wins: --set > -f file > chart defaults in values.yaml. That's how one chart serves many environments." },
+  { q: "Revision 2 (an upgrade) is bad. How do you revert?",
+    options: ["helm uninstall then reinstall","helm rollback self-care 1","Delete the chart directory","There's no way back"], answer: 1,
+    explain: "helm rollback <release> <revision> returns to a prior revision — recorded as a new revision, so history is preserved. --atomic auto-rolls-back a failed upgrade." }
+]);
+</script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 9 — Interactive Visualizations | OpenShift Container Platform</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift Container Platform</a>
+  <span class="pill">Module 9 · Operators, Helm &amp; Deployment</span>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Interactive lab · Self-paced</div>
+    <h1>Operators, Helm &amp; application deployment — visualized</h1>
+    <p class="lede">Three hands-on visualizations that make Module 9 click — how to deploy with plain <strong>Kubernetes manifests</strong>, how <strong>Helm</strong> turns one chart into many configurable <strong>releases</strong>, and how <strong>OLM</strong> installs <strong>Operators</strong> from <strong>OperatorHub</strong> to run complex software for you. Each ends with a short <strong>self-check</strong> quiz.</p>
+  </div>
+
+  <div class="card">
+    <h2>How to use this</h2>
+    <p class="sub" style="margin:0">Work through the three in order (each builds on the last) or jump to any concept. Everything runs in your browser — no install, no internet, no cluster needed. Companion reading: <a href="../../guides/module-09-operators-helm-deployment.md"><code>guides/module-09-operators-helm-deployment.md</code></a>. Then practice for real with the guided <a href="demos/README.md">demos</a> and <a href="exercises/README.md">exercises</a> using <code>oc</code> and <code>helm</code> (Operator install is admin-led).</p>
+  </div>
+
+  <div class="viz-grid">
+    <a class="viz-card" href="01-operators-olm.html">
+      <span class="ix">01</span>
+      <h3>Operators &amp; OLM</h3>
+      <p>Install an Operator from <strong>OperatorHub</strong> and watch <strong>Subscription → InstallPlan → CSV</strong> come to life — then deploy software by creating a <strong>Custom Resource</strong>. Compare <strong>channels</strong> and approval modes.</p>
+      <div class="tags"><span class="tag">OLM</span><span class="tag">OperatorHub</span><span class="tag">CSV</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="02-manifests-deployment.html">
+      <span class="ix">02</span>
+      <h3>Kubernetes Manifests</h3>
+      <p>See how <code>oc apply</code> reconciles YAML idempotently, why <strong>apply</strong> beats <strong>create</strong>, and how <strong>Kustomize</strong> patches one base into per-environment overlays.</p>
+      <div class="tags"><span class="tag">oc apply</span><span class="tag">Kustomize</span><span class="tag">overlays</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="03-helm-charts.html">
+      <span class="ix">03</span>
+      <h3>Helm Charts &amp; Releases</h3>
+      <p>Turn a <strong>chart + values</strong> into a rendered release, override values with <code>--set</code>, and walk the <strong>install → upgrade → rollback</strong> revision history.</p>
+      <div class="tags"><span class="tag">chart/values</span><span class="tag">release</span><span class="tag">rollback</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="01-operators-olm.html" style="border-style:dashed;background:var(--surface-2)">
+      <span class="ix">▶</span>
+      <h3>Start here</h3>
+      <p>New to deploying apps on OpenShift? Begin with visualization 01 and work straight through. ~20–30 minutes total.</p>
+      <div class="tags"><span class="tag">12 questions total</span></div>
+    </a>
+  </div>
+
+  <div class="card" style="margin-top:24px">
+    <h3 style="margin-top:0">What you'll be able to explain afterwards</h3>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li>The three deployment methods — <strong>manifests</strong>, <strong>Helm</strong>, <strong>Operators</strong> — and when to reach for each</li>
+      <li>Why <code>oc apply</code> is idempotent, and how <strong>Kustomize</strong> overlays remove copy-paste</li>
+      <li>How a Helm <strong>chart + values</strong> render into a <strong>release</strong>, and how upgrade/rollback work</li>
+      <li>How <strong>OLM</strong> installs an Operator (Subscription → InstallPlan → CSV) and what channels/approval modes do</li>
+      <li>How you <em>use</em> an Operator by creating a <strong>Custom Resource</strong></li>
+    </ul>
+  </div>
+
+  <div class="card" style="margin-top:6px">
+    <h3 style="margin-top:0">Then take it to a real cluster</h3>
+    <p class="sub" style="margin:0 0 6px">The visualizations build the mental model; these apply it for real with <code>oc</code> and <code>helm</code> (Operator install is admin-led):</p>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li><a href="demos/README.md"><strong>Guided demos</strong></a> — instructor-led tours (install an Operator; deploy from manifests; package &amp; release with Helm).</li>
+      <li><a href="exercises/README.md"><strong>Exercises</strong></a> — you drive, with validation steps and worked solutions, building to a Helm-packaged app capstone.</li>
+      <li><a href="../../guides/module-09-operators-helm-deployment.md"><strong>Concept guide</strong></a> — the deep-dive reference for every object here.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>
