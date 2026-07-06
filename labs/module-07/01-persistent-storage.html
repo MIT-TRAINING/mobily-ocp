@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Persistent Storage — Interactive | Module 7</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .chain { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; margin:10px 0; }
+  .obj { border:2px solid var(--line); border-radius:11px; padding:10px 12px; text-align:center; min-width:120px; background:var(--surface-2); transition:all .35s; }
+  .obj .t { font-weight:800; font-size:12.5px; } .obj .s { font-size:10.5px; color:var(--ink-soft); margin-top:2px; font-family:var(--mono); }
+  .obj.pvc { border-color:var(--blue); } .obj.sc { border-color:var(--purple); } .obj.pv { border-color:var(--line); }
+  .obj.pv.bound { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); }
+  .obj.pvc.bound { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); }
+  .obj.pvc.pending { border-color:var(--amber); background:var(--amber-bg); color:var(--amber-ink); }
+  .arrow { color:var(--muted); font-weight:800; }
+  .disk { display:flex; align-items:center; gap:10px; border:2px dashed var(--line); border-radius:12px; padding:12px; margin-top:10px; background:var(--surface-2); }
+  .disk .data { font-family:var(--mono); font-size:12px; flex:1; }
+  .pod { border:2px solid var(--blue); background:var(--blue-bg); color:var(--blue-ink); border-radius:9px; padding:8px 12px; font-weight:750; font-size:12px; transition:all .3s; }
+  .pod.gone { border-color:var(--red); background:var(--red-bg); color:var(--red-ink); opacity:.4; }
+  .modes-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .modes-row .btn { flex:1 1 120px; } .modes-row .btn.sel { background:var(--blue); color:#fff; border-color:var(--blue); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 7</a>
+  <span class="pill">Visualization 1 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Durable data</div>
+    <h1>Pods are disposable. Your data shouldn't be.</h1>
+    <p class="lede">A <strong>PVC</strong> is a request for storage; a <strong>StorageClass</strong> provisions a real <strong>PV</strong> on demand and binds it. Mount it in a pod and the data outlives the pod. Provision the CDR archive, then kill the pod and watch the data survive.</p>
+  </div>
+
+  <div class="card">
+    <h2>Dynamic provisioning: PVC → StorageClass → PV → Bound</h2>
+    <p class="sub">Create the claim and watch the platform make a disk and bind it — no admin ticket.</p>
+    <div class="controls">
+      <button class="btn primary" id="createPvc">📝 oc apply pvc (10Gi)</button>
+      <button class="btn ghost" id="resetBind">Reset</button>
+    </div>
+    <div class="chain" id="chain">
+      <div class="obj pvc" id="oPvc"><div class="t">PVC cdr-archive</div><div class="s" id="pvcStatus">not created</div></div>
+      <span class="arrow">→</span>
+      <div class="obj sc"><div class="t">StorageClass</div><div class="s">gp3-csi (default)</div></div>
+      <span class="arrow">→</span>
+      <div class="obj pv" id="oPv"><div class="t">PV</div><div class="s" id="pvStatus">—</div></div>
+    </div>
+    <div class="statebar"><span class="counter" id="bindState">PVC: none</span></div>
+    <div class="note" id="bindNote" style="margin-top:8px">You write only the PVC (size + access mode). The StorageClass's CSI provisioner creates a real disk, wraps it as a PV, and binds it 1:1 to your PVC — status goes <strong>Pending → Bound</strong>.</div>
+  </div>
+
+  <div class="card">
+    <h2>Data survives the pod</h2>
+    <p class="sub">Mount the bound PVC at <code>/data</code>, write a CDR, then delete the pod. A replacement re-attaches the <em>same</em> volume.</p>
+    <div class="controls">
+      <button class="btn" id="write" disabled>✍️ write CDR to /data</button>
+      <button class="btn red" id="kill" disabled>💥 delete pod</button>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
+      <span class="pod" id="pod">📦 cdr-writer pod</span>
+      <span class="arrow">mounts</span>
+      <div class="disk"><span>💾</span><span class="data" id="diskData">/data — (empty)</span></div>
+    </div>
+    <div class="note" id="persistNote" style="margin-top:8px">The volume has its own lifecycle. Delete the pod and the disk (and its data) remain; a new pod mounting the same PVC sees the CDRs intact. That's the whole point of persistence.</div>
+  </div>
+
+  <div class="card">
+    <h2>Access modes &amp; reclaim policy</h2>
+    <div class="grid two">
+      <div>
+        <h3 style="margin-top:0">Access mode</h3>
+        <div class="modes-row" id="modes"></div>
+        <div class="note" id="modeNote" style="margin-top:8px">Pick a mode.</div>
+      </div>
+      <div>
+        <h3 style="margin-top:0">Reclaim policy (on PVC delete)</h3>
+        <div class="modes-row">
+          <button class="btn ghost" id="rcDelete">Delete</button>
+          <button class="btn ghost" id="rcRetain">Retain</button>
+        </div>
+        <div class="note" id="rcNote" style="margin-top:8px">Pick a policy.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="index.html">← All visualizations</a>
+    <a class="btn primary" href="02-security-context-constraints.html">Next: Security Context Constraints →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// --- Binding -------------------------------------------------------
+let bound=false, provisioning=false;
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+async function createPvc(){
+  if(provisioning||bound) return; provisioning=true;
+  const pvc=document.getElementById("oPvc"), pv=document.getElementById("oPv");
+  pvc.className="obj pvc pending"; document.getElementById("pvcStatus").textContent="Pending";
+  document.getElementById("bindState").textContent="PVC: Pending"; document.getElementById("bindState").className="counter mismatch";
+  document.getElementById("bindNote").innerHTML="PVC is <strong>Pending</strong> — the CSI provisioner (from the StorageClass) is creating a real disk…";
+  await sleep(900);
+  document.getElementById("pvStatus").textContent="pvc-9f3c… 10Gi";
+  pv.className="obj pv bound";
+  pvc.className="obj pvc bound"; document.getElementById("pvcStatus").textContent="Bound";
+  document.getElementById("bindState").textContent="PVC: Bound ✓"; document.getElementById("bindState").className="counter match";
+  document.getElementById("bindNote").innerHTML="<strong>Bound.</strong> The StorageClass provisioned a 10Gi PV and bound it 1:1 to your PVC. You never touched a PV directly — that's dynamic provisioning.";
+  bound=true; provisioning=false;
+  document.getElementById("write").disabled=false; document.getElementById("kill").disabled=false;
+}
+function resetBind(){
+  bound=false; provisioning=false;
+  document.getElementById("oPvc").className="obj pvc"; document.getElementById("pvcStatus").textContent="not created";
+  document.getElementById("oPv").className="obj pv"; document.getElementById("pvStatus").textContent="—";
+  document.getElementById("bindState").textContent="PVC: none"; document.getElementById("bindState").className="counter";
+  document.getElementById("write").disabled=true; document.getElementById("kill").disabled=true;
+  diskData=[]; podGone=false; renderPersist();
+  document.getElementById("bindNote").innerHTML="You write only the PVC (size + access mode). The StorageClass's CSI provisioner creates a real disk, wraps it as a PV, and binds it 1:1 to your PVC — status goes <strong>Pending → Bound</strong>.";
+}
+document.getElementById("createPvc").addEventListener("click",createPvc);
+document.getElementById("resetBind").addEventListener("click",resetBind);
+
+// --- Persistence ---------------------------------------------------
+let diskData=[], podGone=false;
+function renderPersist(){
+  document.getElementById("diskData").textContent = "/data — " + (diskData.length? diskData.join(", ") : "(empty)");
+  document.getElementById("pod").className = "pod" + (podGone?" gone":"");
+  document.getElementById("pod").textContent = podGone ? "📦 (pod deleted)" : "📦 cdr-writer pod";
+}
+document.getElementById("write").addEventListener("click",()=>{
+  if(!bound) return; diskData.push("cdr-"+String(diskData.length+1).padStart(3,"0")); renderPersist();
+});
+document.getElementById("kill").addEventListener("click",()=>{
+  if(!bound) return; podGone=true; renderPersist();
+  document.getElementById("persistNote").innerHTML="Pod deleted — but look at the disk: the CDRs are <strong>still there</strong>. The PVC/PV lifecycle is independent of the pod.";
+  setTimeout(()=>{ podGone=false; renderPersist();
+    document.getElementById("persistNote").innerHTML="A <strong>new pod</strong> mounted the same PVC and sees the <strong>same data</strong> — nothing was lost. Ephemeral container FS would have been wiped; the PVC persists.";
+  },1400);
+});
+renderPersist();
+
+// --- Access modes --------------------------------------------------
+const AM={
+  RWO:"<strong>ReadWriteOnce (RWO).</strong> Read-write by <em>one node</em> — the norm for block storage (EBS, Ceph RBD). Two pods on the same node can share it; pods across nodes cannot. Perfect for a single-writer subscriber-db.",
+  RWX:"<strong>ReadWriteMany (RWX).</strong> Read-write by <em>many nodes</em> at once — needs file storage (NFS, CephFS/ODF). Use when several pods must write the same volume (a shared CDR-ingest area). Block storage can't do this.",
+  ROX:"<strong>ReadOnlyMany (ROX).</strong> Read-only by many nodes — shared reference data.",
+  RWOP:"<strong>ReadWriteOncePod (RWOP).</strong> Read-write by exactly <em>one pod</em> — the strictest single-writer guarantee."
+};
+const mm=document.getElementById("modes");
+["RWO","RWX","ROX","RWOP"].forEach((k,i)=>{ const b=document.createElement("button"); b.className="btn ghost"; b.textContent=k;
+  b.addEventListener("click",()=>{ document.querySelectorAll("#modes .btn").forEach(x=>x.classList.remove("sel")); b.classList.add("sel"); document.getElementById("modeNote").innerHTML=AM[k]; });
+  mm.appendChild(b); });
+document.querySelectorAll("#modes .btn")[0].classList.add("sel"); document.getElementById("modeNote").innerHTML=AM.RWO;
+
+document.getElementById("rcDelete").addEventListener("click",()=>{
+  document.getElementById("rcDelete").classList.add("sel"); document.getElementById("rcRetain").classList.remove("sel");
+  document.getElementById("rcNote").innerHTML="<strong>Delete</strong> (default for dynamic PVs): deleting the PVC <em>destroys</em> the PV and the disk. Convenient — but a deleted PVC means <strong>lost data</strong>. Guard important claims.";
+});
+document.getElementById("rcRetain").addEventListener("click",()=>{
+  document.getElementById("rcRetain").classList.add("sel"); document.getElementById("rcDelete").classList.remove("sel");
+  document.getElementById("rcNote").innerHTML="<strong>Retain</strong>: deleting the PVC leaves the PV (status <em>Released</em>) and preserves the data; an admin reclaims it deliberately. Use for anything you can't afford to lose by accident.";
+});
+
+renderQuiz("quiz", [
+  { q: "What does a developer create to get durable storage, and what does the platform create in response?",
+    options: ["A PV; the developer also makes the PVC","A PVC; a StorageClass dynamically provisions a PV and binds it","A Secret; a ConfigMap","A pod; a node"], answer: 1,
+    explain: "The developer writes a PVC (size + access mode). The StorageClass's CSI provisioner creates a real disk, wraps it as a PV, and binds it 1:1 — you rarely create PVs by hand." },
+  { q: "You delete the pod that was using a bound PVC. What happens to the data?",
+    options: ["It's wiped with the pod","It persists on the PV; a new pod mounting the PVC sees it","The PVC is deleted too","The StorageClass is removed"], answer: 1,
+    explain: "The PVC/PV lifecycle is independent of the pod. Deleting the pod leaves the volume and its data intact; a replacement re-attaches the same PVC. (Ephemeral container FS or emptyDir would be lost.)" },
+  { q: "Several pods on DIFFERENT nodes must all write the same volume. Which access mode?",
+    options: ["ReadWriteOnce (RWO)","ReadWriteMany (RWX)","ReadOnlyMany (ROX)","ReadWriteOncePod (RWOP)"], answer: 1,
+    explain: "RWX allows read-write by many nodes at once — but needs file storage (NFS, CephFS/ODF). RWO is one node only; block storage can't provide multi-node write." },
+  { q: "A dynamically-provisioned PVC has the default reclaim policy. You delete the PVC. Then?",
+    options: ["The data is retained forever","The PV and its disk are destroyed (Delete policy)","Nothing happens","The pod restarts"], answer: 1,
+    explain: "The default reclaim policy for dynamic PVs is Delete — removing the PVC destroys the PV and backing disk. Use Retain for data you can't afford to lose by an accidental delete." }
+]);
+</script>
+</body>
+</html>

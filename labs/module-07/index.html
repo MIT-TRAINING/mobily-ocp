@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 7 — Interactive Visualizations | OpenShift Container Platform</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift Container Platform</a>
+  <span class="pill">Module 7 · Storage &amp; Security Fundamentals</span>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Interactive lab · Self-paced</div>
+    <h1>OpenShift storage &amp; security — visualized</h1>
+    <p class="lede">Three hands-on visualizations that make Module 7 click — how a <strong>PVC</strong> binds to a <strong>PV</strong> that a <strong>StorageClass</strong> provisions on demand (and how data survives a pod restart), how <strong>Security Context Constraints</strong> keep pods from running as root, and how <strong>ServiceAccounts</strong> and <strong>Secrets</strong> give a pod a safe identity and its credentials. Each ends with a short <strong>self-check</strong> quiz.</p>
+  </div>
+
+  <div class="card">
+    <h2>How to use this</h2>
+    <p class="sub" style="margin:0">Work through the three in order (each builds on the last) or jump to any concept. Everything runs in your browser — no install, no internet, no cluster needed. Companion reading: <a href="../../guides/module-07-storage-security.md"><code>guides/module-07-storage-security.md</code></a>. Then practice for real with the guided <a href="demos/README.md">demos</a> and <a href="exercises/README.md">exercises</a> using <code>oc</code> on the shared OpenShift 4.18 cluster.</p>
+  </div>
+
+  <div class="viz-grid">
+    <a class="viz-card" href="01-persistent-storage.html">
+      <span class="ix">01</span>
+      <h3>Persistent Storage</h3>
+      <p>Create a <strong>PVC</strong> and watch a <strong>StorageClass</strong> dynamically provision a <strong>PV</strong> and bind it — then kill the pod and see the data survive. Explore <strong>access modes</strong> and <strong>reclaim policy</strong>.</p>
+      <div class="tags"><span class="tag">PV/PVC</span><span class="tag">StorageClass</span><span class="tag">RWO/RWX</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="02-security-context-constraints.html">
+      <span class="ix">02</span>
+      <h3>Security Context Constraints</h3>
+      <p>Try to run pods with different requirements and watch <strong>restricted-v2</strong> refuse root, assign a <strong>random UID</strong>, or admit a pod once its <strong>ServiceAccount</strong> is granted a broader <strong>SCC</strong>.</p>
+      <div class="tags"><span class="tag">SCC</span><span class="tag">restricted-v2</span><span class="tag">non-root</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="03-serviceaccounts-secrets.html">
+      <span class="ix">03</span>
+      <h3>ServiceAccounts &amp; Secrets</h3>
+      <p>Give a pod its own <strong>ServiceAccount</strong> identity, then create a <strong>Secret</strong> and see why <strong>base64 isn't encryption</strong> — consumed as env vars or mounted files.</p>
+      <div class="tags"><span class="tag">ServiceAccount</span><span class="tag">Secret</span><span class="tag">base64≠encrypt</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="01-persistent-storage.html" style="border-style:dashed;background:var(--surface-2)">
+      <span class="ix">▶</span>
+      <h3>Start here</h3>
+      <p>New to OpenShift storage &amp; security? Begin with visualization 01 and work straight through. ~20–30 minutes total.</p>
+      <div class="tags"><span class="tag">12 questions total</span></div>
+    </a>
+  </div>
+
+  <div class="card" style="margin-top:24px">
+    <h3 style="margin-top:0">What you'll be able to explain afterwards</h3>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li>How a <strong>PVC → PV</strong> binds, how a <strong>StorageClass</strong> dynamically provisions, and why data survives a pod restart</li>
+      <li><strong>Access modes</strong> (RWO vs RWX) and <strong>reclaim policy</strong> (Delete vs Retain) — and where <strong>ODF</strong> fits</li>
+      <li>Why <strong>restricted-v2</strong> refuses root and assigns a random UID — and why rootless <strong>UBI</strong> images "just work"</li>
+      <li>How to loosen security correctly: grant a <strong>ServiceAccount</strong> a broader <strong>SCC</strong>, never edit the pod</li>
+      <li>How <strong>ServiceAccounts</strong> give pods identity and <strong>Secrets</strong> deliver credentials (and why base64 ≠ encryption)</li>
+    </ul>
+  </div>
+
+  <div class="card" style="margin-top:6px">
+    <h3 style="margin-top:0">Then take it to a real cluster</h3>
+    <p class="sub" style="margin:0 0 6px">The visualizations build the mental model; these apply it on a real OpenShift cluster with <code>oc</code> (shared 4.18 cluster; SCC grants are admin-led):</p>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li><a href="demos/README.md"><strong>Guided demos</strong></a> — instructor-led tours (persistent storage, SCC &amp; non-root, ServiceAccounts &amp; Secrets).</li>
+      <li><a href="exercises/README.md"><strong>Exercises</strong></a> — you drive, with validation steps and worked solutions, building to a stateful-and-secure app capstone.</li>
+      <li><a href="../../guides/module-07-storage-security.md"><strong>Concept guide</strong></a> — the deep-dive reference for every object here.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

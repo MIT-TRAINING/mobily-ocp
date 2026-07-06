@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Security Context Constraints — Interactive | Module 7</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--red-bg); color:var(--red-ink); }
+  .picker { display:flex; flex-direction:column; gap:8px; }
+  .opt { border:2px solid var(--line); border-radius:10px; padding:9px 12px; cursor:pointer; transition:all .2s; font-size:13px; }
+  .opt:hover { border-color:var(--blue); }
+  .opt.sel { border-color:var(--blue); background:var(--blue-bg); color:var(--blue-ink); }
+  .opt .nm { font-weight:750; } .opt .ds { font-size:11.5px; color:var(--ink-soft); } .opt.sel .ds { color:var(--blue-ink); }
+  .verdict { font-size:17px; font-weight:800; padding:12px 14px; border-radius:11px; text-align:center; margin-top:6px; }
+  .verdict.ok { background:var(--green-bg); color:var(--green-ink); } .verdict.no { background:var(--red-bg); color:var(--red-ink); }
+  .ladder { display:flex; flex-direction:column; gap:5px; }
+  .rung { display:flex; justify-content:space-between; border:2px solid var(--line); border-radius:9px; padding:7px 11px; font-size:12.5px; }
+  .rung .nm { font-family:var(--mono); font-weight:700; }
+  .rung.r0 { border-color:var(--green); } .rung.r4 { border-color:var(--red); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 7</a>
+  <span class="pill">Visualization 2 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Secure by default</div>
+    <h1>OpenShift won't run your container as root.</h1>
+    <p class="lede">A <strong>Security Context Constraint</strong> is the admission gate that decides what a pod may run <em>as</em>. The default <strong>restricted-v2</strong> refuses root and assigns a random UID. Choose what the pod needs and which SCC its ServiceAccount has — and watch it get admitted or denied.</p>
+  </div>
+
+  <div class="card">
+    <h2>Pod admission simulator</h2>
+    <div class="grid two">
+      <div>
+        <h3 style="margin-top:0">What the pod needs</h3>
+        <div class="picker" id="needs"></div>
+      </div>
+      <div>
+        <h3 style="margin-top:0">SCC granted to its ServiceAccount</h3>
+        <div class="picker" id="sccs"></div>
+      </div>
+    </div>
+    <div class="verdict" id="verdict"></div>
+    <div class="statebar"><span class="counter" id="uidState"></span></div>
+    <div class="note" id="sccNote" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <h2>The SCC ladder (least → most privileged)</h2>
+    <div class="ladder">
+      <div class="rung r0"><span class="nm">restricted-v2</span><span>non-root · random UID · drops caps — <strong>the default</strong></span></div>
+      <div class="rung"><span class="nm">nonroot-v2</span><span>any non-root UID the image requests</span></div>
+      <div class="rung"><span class="nm">hostmount-anyuid</span><span>mount host paths + any UID</span></div>
+      <div class="rung"><span class="nm">anyuid</span><span>run as any UID incl. <strong>root (0)</strong></span></div>
+      <div class="rung r4"><span class="nm">privileged</span><span>everything — host, root, all caps (node agents only)</span></div>
+    </div>
+    <div class="note ok" style="margin-top:10px"><strong>Grant, don't edit:</strong> you loosen a pod's limits by granting its <em>ServiceAccount</em> a broader SCC (<code>oc adm policy add-scc-to-user anyuid -z my-sa</code>), not by changing the pod. Better still: fix the image to be rootless (UBI/sclorg).</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="01-persistent-storage.html">← Persistent Storage</a>
+    <a class="btn primary" href="03-serviceaccounts-secrets.html">Next: ServiceAccounts &amp; Secrets →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+// pod needs: level required = min SCC rank that admits it
+// ranks: restricted-v2=0, nonroot-v2=1, hostmount-anyuid=2, anyuid=3, privileged=4
+const NEEDS=[
+  { k:"rootless", nm:"Rootless image (UBI/sclorg)", ds:"any non-root UID, port 8080", need:0, cap:"nonroot" },
+  { k:"fixeduid", nm:"Fixed non-root UID (e.g. 1001)", ds:"image hardcodes a non-root user", need:1, cap:"nonroot1" },
+  { k:"root",     nm:"Requires root (UID 0)", ds:"writes /var/run, binds :80", need:3, cap:"root" },
+  { k:"hostpath", nm:"Needs a hostPath mount", ds:"reads a node directory", need:2, cap:"hostpath" },
+  { k:"priv",     nm:"Needs privileged: true", ds:"node-level agent", need:4, cap:"priv" }
+];
+const SCCS=[
+  { k:"restricted-v2", nm:"restricted-v2", ds:"default — non-root, random UID", rank:0 },
+  { k:"nonroot-v2",    nm:"nonroot-v2", ds:"any non-root UID the image wants", rank:1 },
+  { k:"hostmount-anyuid", nm:"hostmount-anyuid", ds:"host paths + any UID", rank:2 },
+  { k:"anyuid",        nm:"anyuid", ds:"any UID incl. root", rank:3 },
+  { k:"privileged",    nm:"privileged", ds:"everything", rank:4 }
+];
+let need=NEEDS[0], scc=SCCS[0];
+function build(id, arr, cur, setter){
+  const el=document.getElementById(id); el.innerHTML="";
+  arr.forEach(o=>{ const d=document.createElement("div"); d.className="opt"+(o.k===cur().k?" sel":"");
+    d.innerHTML=`<div class="nm">${o.nm}</div><div class="ds">${o.ds}</div>`;
+    d.addEventListener("click",()=>{ setter(o); render(); }); el.appendChild(d); });
+}
+function render(){
+  build("needs", NEEDS, ()=>need, o=>need=o);
+  build("sccs", SCCS, ()=>scc, o=>scc=o);
+  const ok = scc.rank >= need.need;
+  const v=document.getElementById("verdict");
+  v.className="verdict "+(ok?"ok":"no");
+  v.textContent = ok ? "✅ Pod admitted" : "⛔ Denied — 'unable to validate against any SCC'";
+  // assigned UID
+  const uid=document.getElementById("uidState");
+  if(ok){
+    let u;
+    if(need.k==="root") u="runs as UID 0 (root)";
+    else if(need.k==="fixeduid") u="runs as UID 1001 (image's own)";
+    else if(scc.rank===0) u="runs as random UID ~1000750000";
+    else u="runs as its requested non-root UID";
+    uid.textContent=u; uid.className="counter match";
+  } else { uid.textContent="pod never starts"; uid.className="counter mismatch"; }
+  // note
+  let note;
+  if(ok && scc.k==="restricted-v2") note="Under <strong>restricted-v2</strong> (the default), OpenShift ignores any root request and runs the container as a <strong>random high UID</strong> from the project range. Rootless UBI images are built for exactly this — group-writable dirs, ports >1024.";
+  else if(!ok && need.k==="root") note="The image wants <strong>root (UID 0)</strong>, but <strong>"+scc.nm+"</strong> forbids it. Real fix: rebuild the image to be rootless. Escape hatch (admin): grant the SA <code>anyuid</code>: <code>oc adm policy add-scc-to-user anyuid -z my-sa</code>.";
+  else if(!ok && need.k==="hostpath") note="A <strong>hostPath</strong> mount needs <code>hostmount-anyuid</code> (or higher). <strong>"+scc.nm+"</strong> doesn't allow it. Grant the SA a suitable SCC — sparingly.";
+  else if(!ok && need.k==="priv") note="<strong>privileged: true</strong> requires the <code>privileged</code> SCC — full host access. Reserve it for node-level agents (CNI, storage, monitoring), never ordinary apps.";
+  else if(ok) note="Admitted: <strong>"+scc.nm+"</strong> (rank "+scc.rank+") is permissive enough for what the pod needs. Remember least privilege — grant the <em>narrowest</em> SCC that works.";
+  else note="Denied: the pod needs more than <strong>"+scc.nm+"</strong> grants. Grant its ServiceAccount a higher SCC, or (better) reduce what the pod needs.";
+  document.getElementById("sccNote").innerHTML=note;
+}
+render();
+
+renderQuiz("quiz", [
+  { q: "What does the default restricted-v2 SCC do to a container that tries to run as root?",
+    options: ["Runs it as root anyway","Refuses root and assigns a random non-root UID","Deletes the image","Grants it privileged access"], answer: 1,
+    explain: "restricted-v2 forbids root and runs the container as a random high UID from the project's range. That's why rootless UBI/sclorg images work and root-requiring images fail." },
+  { q: "Your legacy image MUST run as UID 0. What's the correct OpenShift way to allow it?",
+    options: ["Edit the pod to add privileged:true","Grant the pod's ServiceAccount the anyuid SCC","Disable SCC on the cluster","Run oc as cluster-admin each time"], answer: 1,
+    explain: "You loosen limits by granting the ServiceAccount a broader SCC (e.g. `oc adm policy add-scc-to-user anyuid -z sa`), not by editing the pod. Best of all: rebuild the image to be rootless." },
+  { q: "Which SCC should a normal stateless web app use?",
+    options: ["privileged","anyuid","restricted-v2 (the default)","hostmount-anyuid"], answer: 2,
+    explain: "restricted-v2 is the least-privileged default and fits almost every app. Grant more only when a real need exists — least privilege. privileged is for node-level agents only." },
+  { q: "Why do the course's ubi9/httpd-24 and sclorg images run cleanly under restricted-v2?",
+    options: ["They request privileged mode","They're built to run as an arbitrary non-root UID (group-writable dirs, ports >1024)","They disable SCC","They run as root but hide it"], answer: 1,
+    explain: "Red Hat UBI/sclorg images are designed for arbitrary non-root UIDs — that's exactly what restricted-v2 assigns. A stock image binding :80 as root would be denied." }
+]);
+</script>
+</body>
+</html>
