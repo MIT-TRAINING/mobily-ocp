@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CI/CD &amp; the Jenkins→GitOps Flow — Interactive | Module 10</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .pipe { display:flex; flex-direction:column; gap:6px; }
+  .stage { border:2px solid var(--line); border-radius:10px; padding:9px 12px; font-size:13px; display:flex; justify-content:space-between; align-items:center; transition:all .3s; }
+  .stage.done { border-color:var(--green); background:var(--green-bg); color:var(--green-ink); }
+  .stage.active { border-color:var(--amber); background:var(--amber-bg); color:var(--amber-ink); box-shadow:var(--shadow); }
+  .tag2 { font-size:10px; font-weight:800; padding:1px 8px; border-radius:999px; }
+  .tag2.ci { background:var(--amber-bg); color:var(--amber-ink); } .tag2.cd { background:var(--green-bg); color:var(--green-ink); }
+  .band { font-size:11px; font-weight:800; color:var(--muted); margin:8px 0 2px; letter-spacing:.04em; text-transform:uppercase; }
+  .opts { display:flex; gap:8px; flex-wrap:wrap; } .opts .btn { flex:1 1 150px; } .opts .btn.sel { background:var(--blue); color:#fff; border-color:var(--blue); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 10</a>
+  <span class="pill">Visualization 2 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Pipelines &amp; delivery</div>
+    <h1>CI builds the image. GitOps deploys it.</h1>
+    <p class="lede">A <strong>CI pipeline</strong> turns a commit into a tested container image and pushes it; then it <strong>updates the GitOps repo</strong> and <strong>Argo CD</strong> deploys. Run the flow and watch where <span style="color:var(--amber-ink);font-weight:700">CI</span> ends and <span style="color:var(--green-ink);font-weight:700">CD</span> begins.</p>
+  </div>
+
+  <div class="card">
+    <h2>Pipeline engine</h2>
+    <div class="opts" id="engine"></div>
+    <div class="note" id="engNote" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Run the flow: commit → image → Git → deploy</h2>
+    <div class="controls">
+      <button class="btn primary" id="run">▶ Trigger pipeline (git push)</button>
+      <button class="btn ghost" id="reset">Reset</button>
+    </div>
+    <div class="band">CI — Continuous Integration (code → image)</div>
+    <div class="pipe" id="ciStages"></div>
+    <div class="band">CD — GitOps (image → running)</div>
+    <div class="pipe" id="cdStages"></div>
+    <div class="statebar" style="margin-top:8px"><span class="counter" id="state">idle</span></div>
+    <div class="note" id="note" style="margin-top:8px">CI produces a <strong>tested image</strong> and updates Git; <strong>GitOps</strong> (Argo CD) turns that Git change into a running deployment. Note: CI never touches the cluster — it only pushes to a registry and to Git.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="01-gitops-argocd.html">← GitOps &amp; Argo CD</a>
+    <a class="btn primary" href="03-service-mesh.html">Next: Service Mesh →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const ENG={
+  Tekton:"<strong>OpenShift Pipelines (Tekton).</strong> Kubernetes-native &amp; serverless — Pipeline/Task are CRDs, each step runs in its own pod, nothing runs when idle. Installed via the Pipelines Operator; driven by <code>tkn</code> or the console.",
+  Jenkins:"<strong>Jenkins.</strong> The incumbent server-based CI — a Jenkinsfile (Groovy) defines stages, with a huge plugin ecosystem and a long-running controller + agents. Common where teams have existing investment."
+};
+const eng=document.getElementById("engine");
+["Tekton","Jenkins"].forEach((k,i)=>{ const b=document.createElement("button"); b.className="btn ghost"; b.textContent=k;
+  b.addEventListener("click",()=>{ eng.querySelectorAll(".btn").forEach(x=>x.classList.remove("sel")); b.classList.add("sel"); document.getElementById("engNote").innerHTML=ENG[k]; }); eng.appendChild(b); });
+document.querySelectorAll("#engine .btn")[0].classList.add("sel"); document.getElementById("engNote").innerHTML=ENG.Tekton;
+
+const CI=[["checkout","git clone app repo"],["build & test","compile + unit tests"],["build image","Buildah/S2I → subscriber-api:v2"],["push image","→ registry"],["update GitOps repo","bump tag :v2, commit/PR"]];
+const CD=[["Argo CD detects change","deploy repo changed"],["sync","apply Git → cluster"],["deployed","Deployment rolled to :v2 ✅"]];
+function build(id,arr,cls){ const el=document.getElementById(id); el.innerHTML="";
+  arr.forEach((s,i)=>{ const d=document.createElement("div"); d.className="stage"; d.dataset.k=cls+i;
+    d.innerHTML=`<span>${s[0]} — <span style="color:var(--muted)">${s[1]}</span></span><span class="tag2 ${cls}">${cls.toUpperCase()}</span>`; el.appendChild(d); }); }
+build("ciStages",CI,"ci"); build("cdStages",CD,"cd");
+const SEQ=[...CI.map((_,i)=>"ci"+i),...CD.map((_,i)=>"cd"+i)];
+let running=false;
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+async function run(){
+  if(running) return; running=true; document.getElementById("run").disabled=true; reset(true);
+  for(let i=0;i<SEQ.length;i++){
+    const el=document.querySelector(`[data-k='${SEQ[i]}']`); el.classList.add("active");
+    document.getElementById("state").textContent = SEQ[i].startsWith("ci")?"CI running…":"CD running…";
+    document.getElementById("state").className="counter mismatch";
+    await sleep(500); el.classList.remove("active"); el.classList.add("done");
+    if(SEQ[i]==="ci4") document.getElementById("note").innerHTML="🔀 <strong>Hand-off:</strong> CI's last act is to <strong>update the GitOps repo</strong> (new image tag) — it does <em>not</em> deploy. From here, CD (Argo CD) takes over.";
+  }
+  document.getElementById("state").textContent="deployed :v2 ✅"; document.getElementById("state").className="counter match";
+  document.getElementById("note").innerHTML="<strong>Done.</strong> CI built &amp; tested the image and updated Git; <strong>GitOps</strong> deployed it. CI never held cluster credentials — it only pushed to a registry and to Git. Rollback = revert the deploy-repo commit.";
+  document.getElementById("run").disabled=false; running=false;
+}
+function reset(keepNote){ document.querySelectorAll(".stage").forEach(s=>s.classList.remove("done","active"));
+  document.getElementById("state").textContent="idle"; document.getElementById("state").className="counter";
+  if(!keepNote) document.getElementById("note").innerHTML="CI produces a <strong>tested image</strong> and updates Git; <strong>GitOps</strong> (Argo CD) turns that Git change into a running deployment. Note: CI never touches the cluster — it only pushes to a registry and to Git."; }
+document.getElementById("run").addEventListener("click",run);
+document.getElementById("reset").addEventListener("click",()=>{ if(running) return; reset(false); });
+
+renderQuiz("quiz", [
+  { q: "What is the output of the CI (Continuous Integration) stage?",
+    options: ["A running deployment","An Argo CD Application","A tested, packaged container image","A new Git branch"], answer: 2,
+    explain: "CI builds, tests, and packages a container image (and pushes it). Getting it running is CD's job — here, GitOps." },
+  { q: "In the Jenkins→GitOps flow, how does the deployment actually happen?",
+    options: ["Jenkins runs oc apply against the cluster","CI updates the GitOps repo and Argo CD syncs it","Developers oc edit the deployment","The image deploys itself"], answer: 1,
+    explain: "CI's last step commits the new image tag to the GitOps repo; Argo CD detects the change and syncs. CI never deploys directly — that keeps cluster creds out of the pipeline." },
+  { q: "Why keep the app repo and the deploy (GitOps) repo separate?",
+    options: ["A clean deploy audit trail, and CI needs no cluster credentials","Git technically requires two repos","To make builds slower","Argo CD cannot read an app repo"], answer: 0,
+    explain: "Separating source from deployment manifests gives a clean, auditable deploy history and means the pipeline only pushes to Git/registry — never holding cluster credentials." },
+  { q: "Which is a Kubernetes-native, serverless pipeline option on OpenShift?",
+    options: ["A Jenkins controller","Cron jobs","A Bash script on a bastion","OpenShift Pipelines (Tekton)"], answer: 3,
+    explain: "Tekton (OpenShift Pipelines) is Kubernetes-native and serverless — Pipeline/Task CRDs, each step a pod, nothing running when idle. Jenkins is server-based." }
+]);
+</script>
+</body>
+</html>

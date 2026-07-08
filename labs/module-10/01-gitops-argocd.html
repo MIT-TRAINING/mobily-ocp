@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitOps &amp; Argo CD — Interactive | Module 10</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--red-bg); color:var(--red-ink); }
+  .cols { display:grid; grid-template-columns:1fr auto 1fr; gap:12px; align-items:center; }
+  @media (max-width:760px){ .cols { grid-template-columns:1fr; } }
+  .panel { border:2px solid var(--line); border-radius:12px; padding:12px; }
+  .panel.git { border-color:var(--slate); } .panel.cluster { border-color:var(--blue); }
+  .panel h3 { margin:0 0 6px; font-size:13px; font-family:var(--mono); }
+  .kv { font-family:var(--mono); font-size:13px; }
+  .big { font-size:26px; font-weight:800; }
+  .argo { text-align:center; font-weight:800; color:var(--green-ink); }
+  .toggle { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border:2px solid var(--line); border-radius:8px; font-size:12.5px; cursor:pointer; }
+  .toggle.on { border-color:var(--blue); background:var(--blue-bg); color:var(--blue-ink); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 10</a>
+  <span class="pill">Visualization 1 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · GitOps</div>
+    <h1>Git is the source of truth. Argo CD makes it so.</h1>
+    <p class="lede">In GitOps, the cluster's desired state lives in <strong>Git</strong>, and <strong>Argo CD</strong> continuously reconciles the cluster to match. Commit a change and watch it sync — then drift the cluster directly and watch <strong>self-heal</strong> snap it back.</p>
+  </div>
+
+  <div class="card">
+    <h2>Git ⇄ Cluster, reconciled by Argo CD</h2>
+    <div class="cols">
+      <div class="panel git"><h3>📄 Git (desired)</h3><div class="kv">self-care Deployment<br>replicas: <span class="big" id="gitR">2</span></div></div>
+      <div class="argo" id="argo">Argo CD<br>⟲</div>
+      <div class="panel cluster"><h3>☸️ Cluster (live)</h3><div class="kv">self-care Deployment<br>replicas: <span class="big" id="clusR">2</span></div></div>
+    </div>
+    <div class="statebar" style="margin-top:10px"><span class="counter match" id="sync">Synced ✅</span></div>
+    <div class="controls" style="margin-top:8px">
+      <button class="btn primary" id="commit">📝 commit to Git: replicas 2 → 5</button>
+      <button class="btn red" id="drift">✋ oc scale cluster → 8 (drift)</button>
+      <button class="btn ghost" id="syncBtn">⟲ Sync now</button>
+      <button class="btn ghost" id="resetB">Reset</button>
+    </div>
+    <div class="controls" style="margin-top:8px">
+      <label class="toggle on" id="autoT"><input type="checkbox" id="autoChk" checked> automated sync</label>
+      <label class="toggle on" id="healT"><input type="checkbox" id="healChk" checked> selfHeal (drift correction)</label>
+    </div>
+    <div class="note" id="note" style="margin-top:10px">Argo CD compares <strong>Git</strong> (desired) with the <strong>cluster</strong> (live). Match → <strong>Synced</strong>. Differ → <strong>OutOfSync</strong>, then it applies Git. With <strong>selfHeal</strong>, even changes made directly on the cluster are reverted to Git.</div>
+  </div>
+
+  <div class="card">
+    <h2>The Argo CD Application</h2>
+    <div class="note"><code>kind: Application<br>spec:<br>&nbsp;&nbsp;source: { repoURL: …/self-care.git, path: overlays/prod, targetRevision: main }<br>&nbsp;&nbsp;destination: { server: …default.svc, namespace: self-care-prod }<br>&nbsp;&nbsp;syncPolicy: { automated: { prune: true, selfHeal: true } }</code></div>
+    <div class="note ok" style="margin-top:8px">An <strong>Application</strong> maps a <strong>Git source</strong> (repo/path/revision) to a <strong>cluster/namespace destination</strong>. <strong>Rollback</strong> = <code>git revert</code> or point <code>targetRevision</code> at an older commit — Argo syncs the cluster back.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="index.html">← All visualizations</a>
+    <a class="btn primary" href="02-cicd-pipelines.html">Next: CI/CD &amp; the Jenkins→GitOps flow →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+let git=2, clus=2;
+function render(){
+  document.getElementById("gitR").textContent=git;
+  document.getElementById("clusR").textContent=clus;
+  const synced = git===clus;
+  const s=document.getElementById("sync");
+  s.textContent = synced?"Synced ✅":"OutOfSync ⚠️"; s.className="counter "+(synced?"match":"mismatch");
+  document.getElementById("argo").innerHTML = synced?"Argo CD<br>✅":"Argo CD<br>⟲ reconciling";
+}
+function auto(){ return document.getElementById("autoChk").checked; }
+function heal(){ return document.getElementById("healChk").checked; }
+function maybeAuto(){ if(auto() && git!==clus){ setTimeout(()=>{ clus=git; render();
+  document.getElementById("note").innerHTML="<strong>Automated sync</strong> applied Git to the cluster → back to <strong>Synced</strong>. In GitOps you don't <code>oc apply</code>; you commit, and Argo does the rest."; },700); } }
+document.getElementById("commit").addEventListener("click",()=>{ git=5; render();
+  document.getElementById("note").innerHTML="Committed <strong>replicas: 5</strong> to Git → Application is <strong>OutOfSync</strong>. "+(auto()?"Automated sync will apply it…":"Click <em>Sync now</em> to apply."); maybeAuto(); });
+document.getElementById("drift").addEventListener("click",()=>{ clus=8; render();
+  if(heal()){ document.getElementById("note").innerHTML="Direct <code>oc scale</code> set the cluster to 8 → drift detected (OutOfSync). <strong>selfHeal</strong> will revert it to Git…";
+    setTimeout(()=>{ clus=git; render(); document.getElementById("note").innerHTML="🔁 <strong>selfHeal reverted the drift</strong> — the cluster is back to Git's value ("+git+"). Manual cluster changes don't stick under GitOps."; },800);
+  } else { document.getElementById("note").innerHTML="Drift to 8 with <strong>selfHeal off</strong> → stays OutOfSync until you Sync. Turn selfHeal on to auto-correct."; }
+});
+document.getElementById("syncBtn").addEventListener("click",()=>{ clus=git; render();
+  document.getElementById("note").innerHTML="Manual <strong>Sync</strong> applied Git → cluster. Now Synced."; });
+document.getElementById("resetB").addEventListener("click",()=>{ git=2; clus=2; render();
+  document.getElementById("note").innerHTML="Argo CD compares <strong>Git</strong> (desired) with the <strong>cluster</strong> (live). Match → <strong>Synced</strong>. Differ → <strong>OutOfSync</strong>, then it applies Git. With <strong>selfHeal</strong>, even changes made directly on the cluster are reverted to Git."; });
+document.getElementById("autoChk").addEventListener("change",e=>{ document.getElementById("autoT").classList.toggle("on",e.target.checked); maybeAuto(); });
+document.getElementById("healChk").addEventListener("change",e=>document.getElementById("healT").classList.toggle("on",e.target.checked));
+render();
+
+renderQuiz("quiz", [
+  { q: "In GitOps, what is the single source of truth for the cluster's desired state?",
+    options: ["The Argo CD web UI","The running cluster","The CI pipeline logs","The Git repository"], answer: 3,
+    explain: "Git holds the declarative desired state; Argo CD reconciles the cluster to match it. The UI/pipeline/cluster are not the source of truth — Git is." },
+  { q: "Someone runs `oc scale` directly on the cluster. With selfHeal on, Argo CD…",
+    options: ["Does nothing","Opens a pull request","Reverts the cluster back to match Git","Deletes the Application"], answer: 2,
+    explain: "selfHeal treats any divergence from Git as drift and re-applies Git — so manual cluster changes are undone. Change Git (via PR) to make a lasting change." },
+  { q: "What does an Argo CD Application map together?",
+    options: ["Two containers in one pod","A Git source (repo/path/revision) to a cluster/namespace destination","A Service to its pods","A user to a role"], answer: 1,
+    explain: "An Application binds a Git source to a destination cluster/namespace, with a sync policy. It's the unit Argo CD reconciles." },
+  { q: "How do you roll back a GitOps-managed app to a previous version?",
+    options: ["git revert (or point targetRevision at an older commit) and let Argo sync","oc rollout undo is the only way","Delete the namespace and recreate it","Reinstall the GitOps Operator"], answer: 0,
+    explain: "Because Git is the source of truth, reverting the commit (or targeting an older revision) and letting Argo sync rolls the cluster back — auditable and repeatable." }
+]);
+</script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 10 — Interactive Visualizations | OpenShift Container Platform</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift Container Platform</a>
+  <span class="pill">Module 10 · GitOps, CI/CD &amp; Service Mesh</span>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Interactive lab · Self-paced</div>
+    <h1>GitOps, CI/CD &amp; Service Mesh — visualized</h1>
+    <p class="lede">Three hands-on visualizations that make Module 10 click — how <strong>GitOps / Argo CD</strong> keeps the cluster in sync with Git (and heals drift), how a <strong>CI/CD pipeline</strong> builds an image and hands off to GitOps to deploy, and how a <strong>Service Mesh</strong> uses <strong>sidecars</strong> to secure and canary-route traffic. Each ends with a short <strong>self-check</strong> quiz.</p>
+  </div>
+
+  <div class="card">
+    <h2>How to use this</h2>
+    <p class="sub" style="margin:0">Work through the three in order (each builds on the last) or jump to any concept. Everything runs in your browser — no install, no internet, no cluster needed. Companion reading: <a href="../../guides/module-10-gitops-cicd-servicemesh.md"><code>guides/module-10-gitops-cicd-servicemesh.md</code></a>. Then practice for real with the guided <a href="demos/README.md">demos</a> and <a href="exercises/README.md">exercises</a> (Argo CD / Pipelines / Service Mesh are installed via Operators — admin-led).</p>
+  </div>
+
+  <div class="viz-grid">
+    <a class="viz-card" href="01-gitops-argocd.html">
+      <span class="ix">01</span>
+      <h3>GitOps &amp; Argo CD</h3>
+      <p>Commit to <strong>Git</strong> and watch <strong>Argo CD</strong> sync the cluster; then cause <strong>drift</strong> with an <code>oc edit</code> and see <strong>self-heal</strong> snap it back to Git.</p>
+      <div class="tags"><span class="tag">GitOps</span><span class="tag">Application</span><span class="tag">self-heal</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="02-cicd-pipelines.html">
+      <span class="ix">02</span>
+      <h3>CI/CD &amp; the Jenkins→GitOps Flow</h3>
+      <p>Run a <strong>pipeline</strong> — build, test, image, push — then watch CI <strong>update the GitOps repo</strong> and Argo CD deploy. See where CI ends and CD begins.</p>
+      <div class="tags"><span class="tag">CI vs CD</span><span class="tag">Tekton/Jenkins</span><span class="tag">image→Git→deploy</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="03-service-mesh.html">
+      <span class="ix">03</span>
+      <h3>Service Mesh</h3>
+      <p>Inject <strong>Envoy sidecars</strong> (pods go 2/2), turn on <strong>mTLS</strong>, then slide traffic weights for a <strong>canary</strong> release and watch the split.</p>
+      <div class="tags"><span class="tag">sidecar</span><span class="tag">mTLS</span><span class="tag">canary</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="01-gitops-argocd.html" style="border-style:dashed;background:var(--surface-2)">
+      <span class="ix">▶</span>
+      <h3>Start here</h3>
+      <p>New to GitOps &amp; delivery automation? Begin with visualization 01 and work straight through. ~20–30 minutes total.</p>
+      <div class="tags"><span class="tag">12 questions total</span></div>
+    </a>
+  </div>
+
+  <div class="card" style="margin-top:24px">
+    <h3 style="margin-top:0">What you'll be able to explain afterwards</h3>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li>The four <strong>GitOps principles</strong> and how <strong>Argo CD</strong> reconciles the cluster to Git (sync, drift, self-heal)</li>
+      <li>The difference between <strong>CI</strong> and <strong>CD</strong>, and why GitOps is the CD half</li>
+      <li>The <strong>Jenkins → GitOps</strong> flow: build an image, update Git, let Argo CD deploy — with no cluster creds in CI</li>
+      <li>How a <strong>Service Mesh</strong> works via <strong>sidecars</strong> (data plane) + control plane, and what it adds without code changes</li>
+      <li>How <strong>traffic management</strong> (VirtualService weights) enables <strong>canary</strong> releases, observed in Kiali</li>
+    </ul>
+  </div>
+
+  <div class="card" style="margin-top:6px">
+    <h3 style="margin-top:0">Then take it to a real cluster</h3>
+    <p class="sub" style="margin:0 0 6px">The visualizations build the mental model; these apply it for real (Argo CD / Pipelines / Mesh installed via Operators — admin-led):</p>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li><a href="demos/README.md"><strong>Guided demos</strong></a> — instructor-led tours (Argo CD Application; a CI pipeline → GitOps; a canary in the mesh).</li>
+      <li><a href="exercises/README.md"><strong>Exercises</strong></a> — you drive, with validation steps and worked solutions, building to a build→GitOps→mesh capstone.</li>
+      <li><a href="../../guides/module-10-gitops-cicd-servicemesh.md"><strong>Concept guide</strong></a> — the deep-dive reference for every object here.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

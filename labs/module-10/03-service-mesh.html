@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Service Mesh — Interactive | Module 10</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.match { background:var(--green-bg); color:var(--green-ink); }
+  .counter.mismatch { background:var(--amber-bg); color:var(--amber-ink); }
+  .pods { display:flex; gap:12px; flex-wrap:wrap; }
+  .pod { border:2px solid var(--blue); border-radius:12px; padding:10px; flex:1 1 160px; background:var(--surface-2); }
+  .pod h4 { margin:0 0 6px; font-size:12.5px; font-family:var(--mono); }
+  .box { border:2px solid var(--line); border-radius:8px; padding:6px 8px; font-size:11.5px; font-weight:700; margin-top:5px; text-align:center; }
+  .box.app { border-color:var(--blue); background:var(--blue-bg); color:var(--blue-ink); }
+  .box.envoy { border-color:var(--purple); background:var(--purple-bg); color:var(--purple-ink); }
+  .box.none { border-style:dashed; color:var(--muted); }
+  .link { text-align:center; font-family:var(--mono); font-size:12px; margin:6px 0; }
+  .link.mtls { color:var(--green-ink); font-weight:800; } .link.plain { color:var(--red-ink); }
+  .bar { height:22px; border-radius:8px; overflow:hidden; display:flex; margin-top:8px; }
+  .bar .v1 { background:var(--green); } .bar .v2 { background:var(--amber); }
+  .barlabel { display:flex; justify-content:space-between; font-size:12px; font-weight:700; margin-top:4px; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 10</a>
+  <span class="pill">Visualization 3 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Service Mesh</div>
+    <h1>A proxy beside every pod — security &amp; routing, no code changes.</h1>
+    <p class="lede">A <strong>Service Mesh</strong> injects an <strong>Envoy sidecar</strong> into each pod (the data plane), programmed by <strong>Istiod</strong> (the control plane). That gives you <strong>mTLS</strong> and <strong>traffic routing</strong> — like <strong>canary</strong> releases — without touching app code.</p>
+  </div>
+
+  <div class="card">
+    <h2>Sidecar injection &amp; mTLS</h2>
+    <p class="sub">Toggle injection and watch pods gain an Envoy sidecar (READY goes 1/1 → 2/2), then require mTLS.</p>
+    <div class="controls">
+      <label class="toggle" id="injT"><input type="checkbox" id="injChk"> sidecar injection (label the namespace)</label>
+      <label class="toggle" id="mtlsT"><input type="checkbox" id="mtlsChk"> STRICT mTLS</label>
+    </div>
+    <div class="pods" id="pods" style="margin-top:10px"></div>
+    <div class="link" id="link" style="margin-top:6px"></div>
+    <div class="statebar"><span class="counter" id="readyState"></span></div>
+    <div class="note" id="injNote" style="margin-top:8px">The <strong>app is unaware</strong> — all its traffic transparently flows through its Envoy sidecar (the <strong>data plane</strong>), which <strong>Istiod</strong> (the <strong>control plane</strong>) configures. mTLS, retries, and telemetry happen in the proxy.</div>
+  </div>
+
+  <div class="card">
+    <h2>Canary release with a VirtualService</h2>
+    <p class="sub">Shift a weight to <code>tariff-catalog v2</code> and send traffic — the mesh splits it, no new Route, no code change.</p>
+    <div class="slider-row"><label>traffic → v2</label><input type="range" id="w" min="0" max="100" value="10" step="5"><span class="val" id="wVal">10%</span></div>
+    <div class="bar"><div class="v1" id="barV1" style="width:90%"></div><div class="v2" id="barV2" style="width:10%"></div></div>
+    <div class="barlabel"><span style="color:var(--green-ink)">v1 (stable) <span id="v1pct">90%</span></span><span style="color:var(--amber-ink)"><span id="v2pct">10%</span> v2 (canary)</span></div>
+    <div class="controls" style="margin-top:10px"><button class="btn primary" id="send">📨 send 100 requests</button><button class="btn ghost" id="resetC">Reset</button></div>
+    <div class="statebar"><span class="counter" id="hits">v1: 0 · v2: 0</span></div>
+    <div class="note" id="canNote" style="margin-top:8px">A <strong>VirtualService</strong> routes by <strong>weight</strong> across subsets defined by a <strong>DestinationRule</strong>. Ramp v2 from 10% → 100% while watching its error rate in <strong>Kiali</strong>, or drop to 0% to roll back — instantly, declaratively.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="02-cicd-pipelines.html">← CI/CD &amp; the Jenkins→GitOps flow</a>
+    <a class="btn primary" href="index.html">Done — back to all visualizations →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+function inj(){ return document.getElementById("injChk").checked; }
+function mtls(){ return document.getElementById("mtlsChk").checked; }
+function renderPods(){
+  const injected=inj();
+  const mk=(name)=>`<div class="pod"><h4>${name} — ${injected?"2/2":"1/1"} READY</h4>`+
+    `<div class="box app">app container</div>`+
+    (injected?`<div class="box envoy">🛡️ Envoy sidecar</div>`:`<div class="box none">no sidecar</div>`)+`</div>`;
+  document.getElementById("pods").innerHTML = mk("subscriber-api")+mk("tariff-catalog");
+  const l=document.getElementById("link");
+  if(!injected){ l.className="link plain"; l.textContent="subscriber-api ──HTTP (cleartext)──► tariff-catalog"; }
+  else if(mtls()){ l.className="link mtls"; l.textContent="subscriber-api ══🔒 mTLS (STRICT)══► tariff-catalog"; }
+  else { l.className="link"; l.textContent="subscriber-api ──(via sidecars, permissive)──► tariff-catalog"; }
+  const s=document.getElementById("readyState");
+  s.textContent = injected?(mtls()?"2/2 pods · mTLS STRICT":"2/2 pods · sidecars injected"):"1/1 pods · no mesh";
+  s.className="counter "+(injected?"match":"");
+  document.getElementById("injNote").innerHTML = !injected
+    ? "No sidecars yet — pods are <strong>1/1</strong> and talk plain HTTP. Label the namespace for injection to add the mesh data plane."
+    : mtls()
+      ? "🔒 <strong>STRICT mTLS</strong> — a <code>PeerAuthentication</code> makes the sidecars encrypt &amp; mutually authenticate all service traffic. Zero-trust, and the app changed nothing."
+      : "Pods are now <strong>2/2</strong> (app + Envoy). Traffic flows through the sidecars — turn on STRICT mTLS to encrypt it, or use the canary below.";
+}
+document.getElementById("injChk").addEventListener("change",e=>{ document.getElementById("injT").classList.toggle("on",e.target.checked); if(!e.target.checked){ document.getElementById("mtlsChk").checked=false; document.getElementById("mtlsT").classList.remove("on"); } renderPods(); });
+document.getElementById("mtlsChk").addEventListener("change",e=>{ if(e.target.checked && !inj()){ e.target.checked=false; return; } document.getElementById("mtlsT").classList.toggle("on",e.target.checked); renderPods(); });
+renderPods();
+
+// canary
+let v1=0,v2=0;
+function setW(){ const w=+document.getElementById("w").value;
+  document.getElementById("wVal").textContent=w+"%";
+  document.getElementById("barV1").style.width=(100-w)+"%"; document.getElementById("barV2").style.width=w+"%";
+  document.getElementById("v1pct").textContent=(100-w)+"%"; document.getElementById("v2pct").textContent=w+"%";
+}
+document.getElementById("w").addEventListener("input",setW); setW();
+document.getElementById("send").addEventListener("click",()=>{
+  const w=+document.getElementById("w").value; let a=0,b=0;
+  for(let i=0;i<100;i++){ if(Math.random()*100<w) b++; else a++; }
+  v1+=a; v2+=b;
+  document.getElementById("hits").textContent="v1: "+v1+" · v2: "+v2;
+  document.getElementById("hits").className="counter match";
+  document.getElementById("canNote").innerHTML="Sent 100 requests → ~<strong>"+a+"</strong> to v1, ~<strong>"+b+"</strong> to v2 (weight "+w+"%). The <strong>VirtualService</strong> did the split — no Route change, no redeploy. Ramp the weight up as v2 proves healthy.";
+});
+document.getElementById("resetC").addEventListener("click",()=>{ v1=0;v2=0; document.getElementById("hits").textContent="v1: 0 · v2: 0"; document.getElementById("hits").className="counter"; });
+
+renderQuiz("quiz", [
+  { q: "How does a Service Mesh add mTLS and routing without changing app code?",
+    options: ["It recompiles the application","It injects a sidecar proxy (Envoy) into each pod that handles the traffic","It edits the OpenShift Route","It runs inside the app container"], answer: 1,
+    explain: "The mesh injects an Envoy sidecar per pod; all app traffic flows through it, so mTLS/routing/telemetry happen in the proxy — the app is unaware." },
+  { q: "After sidecar injection, what does `oc get pod` show for READY?",
+    options: ["2/2 (app container + Envoy sidecar)","1/1","0/1","3/3"], answer: 0,
+    explain: "Injection adds a second container (Envoy) to the pod, so READY becomes 2/2. That's a quick visual confirmation the pod joined the mesh." },
+  { q: "Which object shifts 10% of traffic to a new version for a canary release?",
+    options: ["A Route","A NetworkPolicy","A Deployment","A VirtualService with weighted routing"], answer: 3,
+    explain: "A VirtualService defines weighted routing across subsets (defined by a DestinationRule) — e.g. 90% v1 / 10% v2 — enabling canary/blue-green without new Routes or redeploys." },
+  { q: "What is the 'control plane' in a service mesh?",
+    options: ["The Envoy sidecars carrying the traffic","The application containers","Istiod, which configures all the sidecars","The Kiali dashboard"], answer: 2,
+    explain: "Istiod is the control plane — it turns your routing/mTLS intent into config pushed to every Envoy sidecar (the data plane). Kiali is observability, not control." }
+]);
+</script>
+</body>
+</html>
