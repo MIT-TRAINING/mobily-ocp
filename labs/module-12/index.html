@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 12 — Interactive Visualizations | OpenShift Container Platform</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift Container Platform</a>
+  <span class="pill">Module 12 · Backup, Recovery &amp; Troubleshooting</span>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Interactive lab · Self-paced · Course capstone</div>
+    <h1>Backup, Recovery &amp; Troubleshooting — visualized</h1>
+    <p class="lede">Three hands-on visualizations that make Module 12 click — how an <strong>etcd snapshot</strong> becomes your rewind point (and why <strong>restore</strong> is break-glass, not routine), how a pod's <strong>status string</strong> is already a diagnosis you narrow <strong>by layer</strong>, and how the whole course fits into one <strong>end-to-end stack</strong> delivered by GitOps. Each ends with a short <strong>self-check</strong> quiz.</p>
+  </div>
+
+  <div class="card">
+    <h2>How to use this</h2>
+    <p class="sub" style="margin:0">Work through the three in order — they trace the day-2 arc: <strong>protect</strong> the cluster (backup/restore), <strong>diagnose</strong> it when it breaks (troubleshooting), then <strong>prove</strong> you can build and recover a real service (capstone). Everything runs in your browser — no install, no internet, no cluster needed. Companion reading: <a href="../../guides/module-12-backup-recovery-troubleshooting.md"><code>guides/module-12-backup-recovery-troubleshooting.md</code></a>. Then practice for real with the guided <a href="demos/README.md">demos</a> and <a href="exercises/README.md">exercises</a> (backup/restore &amp; node ops need cluster-admin; the capstone is mostly project-user).</p>
+  </div>
+
+  <div class="viz-grid">
+    <a class="viz-card" href="01-etcd-backup-restore.html">
+      <span class="ix">01</span>
+      <h3>etcd Backup &amp; Restore</h3>
+      <p>Take a <strong>snapshot</strong>, create objects, then fail masters — and see the recovery path branch: <strong>heal</strong>, <strong>replace a member</strong>, or a full <strong>restore</strong> that rewinds the cluster and loses everything since the snapshot.</p>
+      <div class="tags"><span class="tag">cluster-backup.sh</span><span class="tag">quorum</span><span class="tag">RPO</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="02-troubleshooting.html">
+      <span class="ix">02</span>
+      <h3>Troubleshooting</h3>
+      <p>Pick a symptom — <code>Pending</code>, <code>CrashLoopBackOff</code>, a degraded <strong>ClusterOperator</strong> — and read the <strong>events &amp; logs</strong> that name the cause. Narrow <em>where</em> before <em>why</em>, every time.</p>
+      <div class="tags"><span class="tag">pod status</span><span class="tag">events</span><span class="tag">oc get co</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="03-capstone.html">
+      <span class="ix">03</span>
+      <h3>The Capstone</h3>
+      <p>Build Mobily's <strong>self-care stack</strong> object by object and watch the customer's request path light up only when every dependency is in place — then see <strong>Argo CD</strong> report the tree <strong>Synced &amp; Healthy</strong>.</p>
+      <div class="tags"><span class="tag">Route+PVC+Secret</span><span class="tag">NetworkPolicy</span><span class="tag">GitOps</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="01-etcd-backup-restore.html" style="border-style:dashed;background:var(--surface-2)">
+      <span class="ix">▶</span>
+      <h3>Start here</h3>
+      <p>Finishing the course? Begin with visualization 01 and work straight through — protect, diagnose, then build &amp; recover a real service. ~20–30 minutes total.</p>
+      <div class="tags"><span class="tag">12 questions total</span></div>
+    </a>
+  </div>
+
+  <div class="card" style="margin-top:24px">
+    <h3 style="margin-top:0">What you'll be able to explain afterwards</h3>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li>How <strong>etcd backup</strong> (<code>cluster-backup.sh</code>) and <strong>restore</strong> work — and why restore is a break-glass, whole-cluster rewind you copy off-cluster and take before risky changes</li>
+      <li>The <strong>restore-vs-replace</strong> decision: lose one master → replace the member; lose <strong>quorum</strong> → restore. Why etcd ≠ app-data backup (PV data needs OADP; config needs Git)</li>
+      <li>The <strong>node lifecycle</strong> — <code>cordon</code> → <code>drain</code> (honouring PDBs) → <code>delete</code> → replace — and what control-plane replacement adds</li>
+      <li>A repeatable <strong>troubleshooting methodology</strong>: narrow <strong>by layer</strong> (platform via <code>oc get co</code>/nodes/etcd vs. app via pod status), let <strong>events narrate</strong>, then read logs</li>
+      <li>How every layer of the course composes into one <strong>end-to-end service</strong> — Route, Service, Deployment, Secret, PVC, NetworkPolicy, monitoring — delivered by <strong>GitOps</strong> and made recoverable by backup &amp; troubleshooting</li>
+    </ul>
+  </div>
+
+  <div class="card" style="margin-top:6px">
+    <h3 style="margin-top:0">Then take it to a real cluster</h3>
+    <p class="sub" style="margin:0 0 6px">The visualizations build the mental model; these apply it for real (backup/restore &amp; node ops are cluster-admin; the capstone is mostly project-user):</p>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li><a href="demos/README.md"><strong>Guided demos</strong></a> — instructor-led tours (take &amp; inspect an etcd backup; walk the troubleshooting loop on real broken pods; build the capstone stack).</li>
+      <li><a href="exercises/README.md"><strong>Exercises</strong></a> — you drive, with validation steps and worked solutions, building to the full end-to-end capstone deploy.</li>
+      <li><a href="../../guides/module-12-backup-recovery-troubleshooting.md"><strong>Concept guide</strong></a> — the deep-dive reference for every object and command here.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Troubleshooting — Interactive | Module 12</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .picker { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 4px; }
+  .sym { border:2px solid var(--line); border-radius:10px; padding:8px 12px; font-family:var(--mono); font-size:12.5px; font-weight:700; cursor:pointer; background:var(--surface-2); transition:.15s; }
+  .sym:hover { border-color:var(--blue); }
+  .sym.active { border-color:var(--red); background:var(--red-bg); color:var(--red-ink); }
+  .term { font-family:var(--mono); font-size:12.5px; background:#1b1f24; color:#e6e6e6; border-radius:10px; padding:12px 14px; margin:10px 0; white-space:pre-wrap; line-height:1.5; overflow-x:auto; }
+  .term .p { color:#7cc7ff; }
+  .term .r { color:#ff8a80; }
+  .term .g { color:#a5d6a7; }
+  .term .d { color:#9aa0a6; }
+  .layer { display:inline-block; font-size:11px; font-weight:800; padding:3px 9px; border-radius:8px; margin-bottom:4px; }
+  .layer.app { background:var(--blue-bg); color:var(--blue-ink); }
+  .layer.plat { background:var(--amber-bg,#fef7e0); color:#8a6100; }
+  .diag { border:2px solid var(--line); border-radius:12px; padding:12px 14px; margin-top:8px; }
+  .steps { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; }
+  .step { font-family:var(--mono); font-size:11.5px; padding:4px 9px; border-radius:8px; background:var(--slate-bg); font-weight:700; }
+  .step .n { color:var(--blue-ink); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 12</a>
+  <span class="pill">Visualization 2 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Troubleshooting methodology</div>
+    <h1>The status string is already a diagnosis.</h1>
+    <p class="lede">Troubleshooting is <strong>narrowing by layer</strong>: answer <em>where</em> before <em>why</em>. A pod's status tells you the <strong>class</strong> of problem before you read a single log. Pick a symptom below and walk the same loop every time — <strong>status → events → logs → fix</strong>.</p>
+  </div>
+
+  <div class="card">
+    <h2>Pick a symptom on <code>subscriber-api</code></h2>
+    <div class="picker" id="picker">
+      <div class="sym active" data-k="pending">Pending</div>
+      <div class="sym" data-k="pull">ImagePullBackOff</div>
+      <div class="sym" data-k="crash">CrashLoopBackOff</div>
+      <div class="sym" data-k="ready">Running 0/1</div>
+      <div class="sym" data-k="co">ClusterOperator Degraded</div>
+    </div>
+
+    <div class="term" id="term"></div>
+
+    <div class="diag" id="diag"></div>
+
+    <div class="note" style="margin-top:10px"><strong>The loop, every time:</strong>
+      <span class="step"><span class="n">1</span> get (status = where)</span>
+      <span class="step"><span class="n">2</span> describe/events (why)</span>
+      <span class="step"><span class="n">3</span> logs [--previous]</span>
+      <span class="step"><span class="n">4</span> smallest fix</span>
+      <span class="step"><span class="n">5</span> confirm + must-gather</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Where does it live — app or platform?</h2>
+    <div class="note"><strong>App layer</strong> (your namespace): <code>oc get pods</code> → <code>describe</code> → <code>logs</code>. Status strings like <em>Pending / ImagePullBackOff / CrashLoopBackOff / 0/1 Ready</em>. &nbsp; <strong>Platform layer</strong>: <code>oc get co</code>, <code>oc get nodes</code>, <code>oc get etcd</code>, <code>oc adm node-logs</code>. Degraded operators, NotReady nodes, pending CSRs.</div>
+    <div class="note ok" style="margin-top:8px"><strong>Events narrate failures.</strong> <code>oc get events --sort-by=.lastTimestamp</code> is the golden first move — OpenShift writes <em>FailedScheduling / ImagePullBackOff / Unhealthy / FailedMount</em> there before you ever open a log. Events = <em>where</em>; logs = <em>why</em>.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="01-etcd-backup-restore.html">← etcd Backup &amp; Restore</a>
+    <a class="btn primary" href="03-capstone.html">Next: The Capstone →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const CASES = {
+  pending: {
+    layer:"app", lname:"Application · your namespace",
+    term:'<span class="p">$ oc get pods -n mobily-apps</span>\nNAME                        READY   STATUS    RESTARTS   AGE\nsubscriber-api-7d9c-abcde   <span class="r">0/1     Pending</span>   0          2m\n\n<span class="p">$ oc describe pod subscriber-api-7d9c-abcde -n mobily-apps</span>\n<span class="d">...</span>\nEvents:\n  <span class="r">Warning  FailedScheduling</span>  0/5 nodes are available:\n           2 Insufficient memory, 3 node(s) had untolerated taint.',
+    cause:"<strong>Can't be scheduled.</strong> The <code>FailedScheduling</code> event names it: no node has enough memory (and the masters are tainted). Also common here: an <strong>unbound PVC</strong> or an exhausted <strong>quota</strong>.",
+    fix:"Lower the pod's memory request, free/scale capacity, or fix the PVC/quota. Re-check with <code>oc get events --sort-by=.lastTimestamp</code>."
+  },
+  pull: {
+    layer:"app", lname:"Application · your namespace",
+    term:'<span class="p">$ oc get pods -n mobily-apps</span>\nNAME                        READY   STATUS             RESTARTS   AGE\nsubscriber-api-7d9c-abcde   <span class="r">0/1     ImagePullBackOff</span>   0          90s\n\n<span class="p">$ oc describe pod subscriber-api-7d9c-abcde -n mobily-apps</span>\nEvents:\n  <span class="r">Warning  Failed</span>  Failed to pull image "quay.io/mobily/subscriber-api:v1.4":\n           <span class="r">unauthorized</span>: authentication required',
+    cause:"<strong>Can't get the image.</strong> Here it's <code>unauthorized</code> — a private registry with no/expired <strong>pull secret</strong>. The other flavours: a typo'd image name/tag (<code>not found</code>) or an unreachable registry.",
+    fix:"Fix the image ref, or link a pull secret: <code>oc secrets link default &lt;pull-secret&gt; --for=pull</code>. No logs needed — the event says it all."
+  },
+  crash: {
+    layer:"app", lname:"Application · your namespace",
+    term:'<span class="p">$ oc get pods -n mobily-apps</span>\nNAME                        READY   STATUS             RESTARTS   AGE\nsubscriber-api-7d9c-abcde   <span class="r">0/1     CrashLoopBackOff</span>   6          5m\n\n<span class="p">$ oc logs subscriber-api-7d9c-abcde -n mobily-apps --previous</span>\n<span class="d">... starting subscriber-api ...</span>\n<span class="r">FATAL: could not connect to subscriber-db:5432: connection refused</span>\n<span class="r">exit code 1</span>',
+    cause:"<strong>The app starts, then exits.</strong> The tell is <code>--previous</code>: the container's <em>last</em> logs name the cause — the DB it depends on is refusing connections. Config/secret errors and missing dependencies land here too.",
+    fix:"Follow it downstream (is <code>subscriber-db</code> up? OOMKilled?). Fix the dependency; the app stops crash-looping. <code>oc logs --previous</code> is the key — the current container may be too young to have logged."
+  },
+  ready: {
+    layer:"app", lname:"Application · your namespace",
+    term:'<span class="p">$ oc get pods -n mobily-apps</span>\nNAME                        READY   STATUS    RESTARTS   AGE\nsubscriber-api-7d9c-abcde   <span class="r">0/1</span>     <span class="g">Running</span>   0          3m\n\n<span class="p">$ oc describe pod subscriber-api-7d9c-abcde -n mobily-apps</span>\nEvents:\n  <span class="r">Warning  Unhealthy</span>  Readiness probe failed:\n           HTTP probe failed with statuscode: 503',
+    cause:"<strong>Running but not Ready.</strong> The container is up, but its <strong>readiness probe</strong> fails — so the Service won't send it traffic (empty endpoints → 503 through the Route). Either the probe path/port is wrong, or the app genuinely isn't ready (a dependency is down).",
+    fix:"Check the probe path/port vs. the app; check the dependency. <code>oc get endpoints subscriber-api</code> empty = confirms no ready pods behind the Service."
+  },
+  co: {
+    layer:"plat", lname:"Platform · cluster-admin",
+    term:'<span class="p">$ oc get co</span>\nNAME          VERSION   AVAILABLE   PROGRESSING   <span class="r">DEGRADED</span>\nauthentication 4.18.9   True        False         False\nnetwork       4.18.9    True        False         False\n<span class="r">ingress       4.18.9    False       True          True</span>\n\n<span class="p">$ oc describe co ingress</span>\n  <span class="r">Degraded: True</span> — IngressControllerDegraded: one or more\n           ingress controller pods are not scheduled (no available router nodes)',
+    cause:"<strong>Platform layer — read <code>oc get co</code> first.</strong> A ClusterOperator's <code>DEGRADED=True</code> and its condition <strong>message</strong> almost always name the cause verbatim — here, router pods can't schedule (a node problem underneath).",
+    fix:"Follow the message down a layer: <code>oc get nodes</code> / <code>oc adm node-logs</code>. For evidence, <code>oc adm must-gather</code>. This is NOT a namespace/app problem — different toolbox."
+  }
+};
+
+function show(k){
+  const c=CASES[k];
+  document.querySelectorAll(".sym").forEach(s=>s.classList.toggle("active", s.dataset.k===k));
+  document.getElementById("term").innerHTML=c.term;
+  document.getElementById("diag").innerHTML =
+    '<span class="layer '+c.layer+'">'+c.lname+'</span><br>'+
+    '<div style="margin-top:4px"><strong>Diagnosis:</strong> '+c.cause+'</div>'+
+    '<div class="note ok" style="margin-top:8px"><strong>Fix:</strong> '+c.fix+'</div>';
+}
+document.querySelectorAll(".sym").forEach(s=>s.addEventListener("click",()=>show(s.dataset.k)));
+show("pending");
+
+renderQuiz("quiz", [
+  { q: "A pod is stuck in <code>CrashLoopBackOff</code>. Which command most reliably shows <em>why</em> it exited?",
+    options: ["oc get pods (the status is enough)","oc logs &lt;pod&gt; --previous — the crashed container's last output","oc get co","oc adm must-gather"], answer: 1,
+    explain: "CrashLoopBackOff means it starts then dies. The current container may be too young to have logged; --previous shows the last exited container's output, which names the cause (bad config, missing secret, dependency down)." },
+  { q: "You run <code>oc get co</code> and see <code>ingress</code> with <code>DEGRADED=True</code>. What layer are you troubleshooting, and where's the cause usually stated?",
+    options: ["Application layer; in the pod's readiness probe","Storage layer; in the PVC events","Network policy; in the Route annotations","Platform layer; the ClusterOperator's condition message almost always names the cause"], answer: 3,
+    explain: "ClusterOperators are the platform's self-diagnosis. A degraded operator's status condition message states the reason (here, router pods can't schedule) — a different toolbox from app/namespace troubleshooting." },
+  { q: "A pod shows <code>ImagePullBackOff</code>. Which is NOT a typical cause?",
+    options: ["The application crashed after starting due to a bad database password","A typo in the image name or tag","A private registry with a missing or expired pull secret","The registry host is unreachable from the node"], answer: 0,
+    explain: "ImagePullBackOff happens before the container ever runs — it's purely about fetching the image (bad ref, auth, or reachability). An app crashing on a bad DB password is CrashLoopBackOff, a runtime problem." },
+  { q: "What makes <code>oc get events --sort-by=.lastTimestamp</code> the recommended first move?",
+    options: ["It restarts failing pods automatically","It bundles logs for Red Hat support","OpenShift narrates most failures there (FailedScheduling, Unhealthy, FailedMount) — events tell you *where* before logs tell you *why*","It's the only way to see ClusterOperator status"], answer: 2,
+    explain: "Events are OpenShift's own narration of what's going wrong, in time order. They localise the problem (the 'where') before you open any log for the 'why' — the core of narrowing by layer." }
+]);
+</script>
+</body>
+</html>

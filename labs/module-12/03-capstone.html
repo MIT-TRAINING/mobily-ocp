@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Capstone — Interactive | Module 12</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .build { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:10px 0; }
+  @media (max-width:640px){ .build { grid-template-columns:1fr; } }
+  .obj { border:2px solid var(--line); border-radius:10px; padding:9px 12px; cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:center; gap:8px; transition:.15s; }
+  .obj .mod { font-size:10px; font-weight:800; color:var(--ink-soft); font-family:var(--mono); }
+  .obj .nm { font-weight:700; font-size:13px; }
+  .obj.on { border-color:var(--green,#34a853); background:var(--green-bg); }
+  .obj.on .nm { color:var(--green-ink); }
+  .obj .tick { font-weight:900; opacity:0; }
+  .obj.on .tick { opacity:1; color:var(--green-ink); }
+  .chain { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:6px 0; font-family:var(--mono); font-size:12px; }
+  .node { padding:6px 10px; border-radius:9px; border:2px solid var(--line); font-weight:700; background:var(--surface-2); }
+  .node.ok { border-color:var(--green,#34a853); background:var(--green-bg); color:var(--green-ink); }
+  .node.bad { border-color:var(--red); background:var(--red-bg); color:var(--red-ink); }
+  .arrow { color:var(--ink-soft); font-weight:800; }
+  .verdict { border:2px solid var(--line); border-radius:12px; padding:12px 14px; font-weight:700; margin-top:8px; }
+  .verdict.ok { border-color:var(--green,#34a853); background:var(--green-bg); color:var(--green-ink); }
+  .verdict.bad { border-color:var(--red); background:var(--red-bg); color:var(--red-ink); }
+  .argo { display:flex; gap:12px; align-items:center; margin-top:8px; }
+  .badge { font-family:var(--mono); font-weight:800; font-size:12px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .badge.sync { background:var(--green-bg); color:var(--green-ink); }
+  .badge.out { background:var(--amber-bg,#fef7e0); color:#8a6100; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 12</a>
+  <span class="pill">Visualization 3 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · The Capstone</div>
+    <h1>One service. Every layer of the course.</h1>
+    <p class="lede">Build Mobily's <strong>self-care stack</strong> object by object — <strong>Secret</strong>, <strong>PVC</strong>, <strong>Deployments</strong>, <strong>Services</strong>, a <strong>Route</strong>, a <strong>NetworkPolicy</strong>, <strong>monitoring</strong>, and finally an <strong>Argo CD</strong> Application. Watch the customer's request path light up only when every dependency is in place — and see when GitOps reports the tree <strong>Synced &amp; Healthy</strong>.</p>
+  </div>
+
+  <div class="card">
+    <h2>Build the stack — click to add each object</h2>
+    <div class="build" id="build">
+      <div class="obj" data-k="secret"><span><span class="nm">Secret</span> · db creds <span class="mod">M7</span></span><span class="tick">✓</span></div>
+      <div class="obj" data-k="pvc"><span><span class="nm">PersistentVolumeClaim</span> <span class="mod">M7</span></span><span class="tick">✓</span></div>
+      <div class="obj" data-k="db"><span><span class="nm">Deployment: subscriber-db</span> <span class="mod">M3</span></span><span class="tick">✓</span></div>
+      <div class="obj" data-k="api"><span><span class="nm">Deployment: subscriber-api</span> <span class="mod">M3</span></span><span class="tick">✓</span></div>
+      <div class="obj" data-k="portal"><span><span class="nm">Deployment: self-care</span> <span class="mod">M3</span></span><span class="tick">✓</span></div>
+      <div class="obj" data-k="svc"><span><span class="nm">Services ×3</span> <span class="mod">M3/M6</span></span><span class="tick">✓</span></div>
+      <div class="obj" data-k="route"><span><span class="nm">Route (edge TLS)</span> <span class="mod">M6</span></span><span class="tick">✓</span></div>
+      <div class="obj" data-k="np"><span><span class="nm">NetworkPolicy</span> <span class="mod">M6</span></span><span class="tick">✓</span></div>
+      <div class="obj" data-k="mon"><span><span class="nm">ServiceMonitor + alert</span> <span class="mod">M11</span></span><span class="tick">✓</span></div>
+      <div class="obj" data-k="argo"><span><span class="nm">Argo CD Application</span> <span class="mod">M10</span></span><span class="tick">✓</span></div>
+    </div>
+    <div class="controls" style="margin-top:6px">
+      <button class="btn primary" id="all">Build all</button>
+      <button class="btn ghost" id="clear">Clear</button>
+    </div>
+
+    <h3 style="margin:14px 0 4px;font-size:14px">Customer request path</h3>
+    <div class="chain" id="chain">
+      <span class="node" id="c-user">Customer</span><span class="arrow">→</span>
+      <span class="node" id="c-route">Route</span><span class="arrow">→</span>
+      <span class="node" id="c-portal">self-care</span><span class="arrow">→</span>
+      <span class="node" id="c-api">subscriber-api</span><span class="arrow">→</span>
+      <span class="node" id="c-db">subscriber-db</span><span class="arrow">→</span>
+      <span class="node" id="c-pvc">PV data</span>
+    </div>
+
+    <div class="verdict bad" id="verdict"></div>
+
+    <h3 style="margin:14px 0 4px;font-size:14px">GitOps (Argo CD)</h3>
+    <div class="argo">
+      <span class="badge" id="b-sync">Sync: —</span>
+      <span class="badge" id="b-health">Health: —</span>
+    </div>
+    <div class="note" id="argonote" style="margin-top:6px">Add the <strong>Argo CD Application</strong> after committing the manifests to Git — it syncs the desired state and self-heals drift.</div>
+  </div>
+
+  <div class="card">
+    <h2>Why order &amp; dependencies matter</h2>
+    <div class="note"><strong>Secret &amp; PVC first</strong> — the DB won't start without its credentials or durable storage. <strong>Services</strong> give pods stable addresses; the <strong>Route</strong> is useless without a Service behind it (empty endpoints → 503). The <strong>NetworkPolicy</strong> guards who may reach the api. <strong>Monitoring</strong> watches it; <strong>Argo CD</strong> makes the whole thing declarative &amp; recoverable from Git.</div>
+    <div class="note ok" style="margin-top:8px">This is the entire course in one object graph: Route (M6) → Service (M3) → Deployment (M3) → Secret (M7) → PVC/PV (M7), in a Project (M8), guarded by NetworkPolicy (M6), watched by Prometheus (M11), delivered by GitOps (M10), recoverable via etcd backup + troubleshooting (M12).</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="02-troubleshooting.html">← Troubleshooting</a>
+    <a class="btn primary" href="index.html">Finish — back to all visualizations →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const KEYS=["secret","pvc","db","api","portal","svc","route","np","mon","argo"];
+let on={}; KEYS.forEach(k=>on[k]=false);
+
+function setNode(id,state){ const el=document.getElementById(id); el.className="node"+(state?(" "+state):""); }
+
+function render(){
+  KEYS.forEach(k=>document.querySelector('.obj[data-k="'+k+'"]').classList.toggle("on",on[k]));
+  // request path: each hop needs its object AND its downstream dependency
+  const dbOK   = on.db && on.secret && on.pvc;          // db needs creds + storage
+  const apiOK  = on.api && on.secret && dbOK && on.svc; // api needs creds, db, a Service
+  const portOK = on.portal && apiOK && on.svc;          // portal needs api
+  const routeOK= on.route && on.svc && portOK;          // route needs a Service + portal
+  setNode("c-user","ok");
+  setNode("c-route", on.route ? (routeOK?"ok":"bad") : "");
+  setNode("c-portal", on.portal ? (portOK?"ok":"bad") : "");
+  setNode("c-api", on.api ? (apiOK?"ok":"bad") : "");
+  setNode("c-db", on.db ? (dbOK?"ok":"bad") : "");
+  setNode("c-pvc", on.pvc ? "ok" : "");
+
+  const v=document.getElementById("verdict");
+  if(routeOK){ v.className="verdict ok";
+    v.innerHTML="✅ <strong>Customer can reach self-care end to end.</strong> HTTPS hits the Route → Service → self-care → subscriber-api (creds from the Secret) → subscriber-db → PV. Every layer of the course, wired together."; }
+  else {
+    let miss=[];
+    if(!on.secret) miss.push("<code>Secret</code> (db creds)");
+    if(!on.pvc) miss.push("<code>PVC</code> (db storage)");
+    if(!on.db) miss.push("<code>subscriber-db</code>");
+    if(!on.api) miss.push("<code>subscriber-api</code>");
+    if(!on.portal) miss.push("<code>self-care</code>");
+    if(!on.svc) miss.push("<code>Services</code>");
+    if(!on.route) miss.push("<code>Route</code>");
+    v.className="verdict bad";
+    v.innerHTML="⛔ <strong>Path broken.</strong> Missing/unsatisfied: "+ (miss.length?miss.join(", "):"a dependency") +
+      ". A Route with no Service behind it → empty endpoints → <strong>503</strong>; a DB with no Secret/PVC won't start.";
+  }
+  // Argo CD
+  const committed=KEYS.filter(k=>k!=="argo");
+  const allBuilt=committed.every(k=>on[k]);
+  const bs=document.getElementById("b-sync"), bh=document.getElementById("b-health");
+  const an=document.getElementById("argonote");
+  if(!on.argo){ bs.className="badge"; bs.textContent="Sync: —"; bh.className="badge"; bh.textContent="Health: —";
+    an.innerHTML="Add the <strong>Argo CD Application</strong> after committing the manifests to Git — it syncs the desired state and self-heals drift."; return; }
+  if(allBuilt){ bs.className="badge sync"; bs.textContent="Sync: Synced"; bh.className="badge sync"; bh.textContent="Health: Healthy";
+    an.innerHTML="🟢 <strong>Argo CD: Synced &amp; Healthy.</strong> Git is the source of truth; the live cluster matches it. Delete an object by hand and Argo CD <strong>self-heals</strong> it back — the Module 10 payoff, and your recovery net alongside the etcd snapshot."; }
+  else { bs.className="badge out"; bs.textContent="Sync: OutOfSync"; bh.className="badge out"; bh.textContent="Health: Degraded";
+    an.innerHTML="🟡 <strong>Argo CD: OutOfSync / Degraded.</strong> The Application points at Git, but not every declared object is healthy yet. Argo shows exactly which resources differ — build the rest of the stack."; }
+}
+
+document.querySelectorAll(".obj").forEach(o=>o.addEventListener("click",()=>{ on[o.dataset.k]=!on[o.dataset.k]; render(); }));
+document.getElementById("all").addEventListener("click",()=>{ KEYS.forEach(k=>on[k]=true); render(); });
+document.getElementById("clear").addEventListener("click",()=>{ KEYS.forEach(k=>on[k]=false); render(); });
+render();
+
+renderQuiz("quiz", [
+  { q: "You created a <code>Route</code> and a <code>Deployment</code>, but customers get <strong>503</strong>. The pods are healthy. What's the most likely missing/wrong piece?",
+    options: ["etcd has lost quorum","The Deployment needs more replicas","The Service is missing or its selector doesn't match the pods — the Route has no ready endpoints behind it","The Route needs a second TLS certificate"], answer: 2,
+    explain: "A Route forwards to a Service, which routes to pods matching its selector. No Service (or a mismatched selector) = empty endpoints = 503, even though the pods are fine. oc get endpoints <svc> shows the empty set." },
+  { q: "In the capstone build order, why do the <code>Secret</code> and <code>PVC</code> come before the database <code>Deployment</code>?",
+    options: ["They must be in a different namespace","The database pod won't start correctly without its credentials (Secret) and durable storage (PVC) to mount","OpenShift alphabetises object creation","Argo CD requires it"], answer: 1,
+    explain: "The db Deployment mounts the Secret (creds) and the PVC (data). Create them first so the pod's referenced volumes/env exist — otherwise you get CreateContainerConfigError or FailedMount." },
+  { q: "Once the whole stack is committed to Git and an Argo CD <code>Application</code> manages it, what happens if someone deletes the Route by hand?",
+    options: ["The whole cluster must be restored from an etcd snapshot","Nothing detects it — GitOps only applies once","Argo CD is disabled until an admin re-syncs","Argo CD detects the drift (OutOfSync) and self-heals it back to match Git"], answer: 3,
+    explain: "Git is the source of truth. Argo CD continuously compares live state to Git; a hand-deleted object shows as OutOfSync and (with auto-sync/self-heal) is recreated — declarative recovery, complementing the etcd backup." },
+  { q: "The capstone is described as 'the whole course in one exercise.' Which mapping is correct?",
+    options: ["Route→M6 networking, PVC/Secret→M7 storage & security, GitOps→M10, monitoring→M11, backup/troubleshooting→M12","Route→M11, PVC→M10, Secret→M6, GitOps→M7","Everything belongs to Module 3 only","Route→M12, PVC→M12, Secret→M12, GitOps→M12"], answer: 0,
+    explain: "Each object is a module: Route/NetworkPolicy (M6), PVC/Secret (M7), Deployments/Services (M3), Project/RBAC (M8), ServiceMonitor (M11), Argo CD (M10), and backup + troubleshooting (M12). Building and recovering it exercises the full course." }
+]);
+</script>
+</body>
+</html>
