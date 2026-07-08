@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>etcd &amp; Quorum — Interactive | Module 11</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:10px 0; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.ok { background:var(--green-bg); color:var(--green-ink); }
+  .counter.warn { background:var(--red-bg); color:var(--red-ink); }
+  .members { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin:10px 0; }
+  .member { width:150px; border:2px solid var(--line); border-radius:14px; padding:12px; text-align:center; cursor:pointer; transition:.15s; background:var(--surface); }
+  .member.up { border-color:var(--green); }
+  .member.down { border-color:var(--red); opacity:.55; background:var(--red-bg); }
+  .member.leader { border-color:var(--blue); box-shadow:0 0 0 3px var(--blue-bg); }
+  .member .role { font-size:11px; font-family:var(--mono); font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--ink-soft); }
+  .member .name { font-weight:800; margin:4px 0; }
+  .member .dot { font-size:22px; }
+  .rng { width:100%; }
+  .apis { text-align:center; font-weight:800; font-size:15px; padding:10px; border-radius:12px; margin-top:6px; }
+  .apis.ok { background:var(--green-bg); color:var(--green-ink); }
+  .apis.warn { background:var(--red-bg); color:var(--red-ink); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 11</a>
+  <span class="pill">Visualization 3 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · etcd Administration</div>
+    <h1>Lose a minority, survive. Lose the majority, lose the cluster.</h1>
+    <p class="lede">etcd is the cluster's brain: 3 members on the control plane, kept consistent by <strong>Raft</strong>. Writes need a <strong>majority</strong> (<strong>quorum</strong>). Click members to fail them and watch the API stay up — until quorum breaks. Then push <strong>fsync latency</strong> up and watch a "healthy" cluster still go sick.</p>
+  </div>
+
+  <div class="card">
+    <h2>3-member control plane — click a member to fail/recover it</h2>
+    <div class="members" id="members"></div>
+    <div class="statebar">
+      <span class="counter" id="upCount">3 of 3 up</span>
+      <span class="counter" id="quorum">quorum: 2 needed</span>
+    </div>
+    <div class="apis ok" id="apis">✅ etcd has quorum — API server accepts writes</div>
+    <div class="controls" style="margin-top:10px">
+      <button class="btn ghost" id="fiveT">Switch to 5 members</button>
+      <button class="btn ghost" id="reset">Reset all up</button>
+    </div>
+    <div class="note" id="note" style="margin-top:10px">Quorum = <strong>majority</strong> = <code>floor(N/2)+1</code>. With 3 members you need <strong>2</strong>. Fail one → still 2, healthy. Fail a second → only 1 (a minority) → <strong>quorum lost</strong>, the API goes read-only. This is why control planes have an <strong>odd</strong> number of masters.</div>
+  </div>
+
+  <div class="card">
+    <h2>Healthy isn't only "up" — it's also "fast"</h2>
+    <div class="statebar"><span class="counter ok" id="fsyncVal">p99 fsync: 3 ms</span></div>
+    <input class="rng" id="fsync" type="range" min="1" max="40" step="1" value="3">
+    <div class="note" id="perfNote" style="margin-top:8px">etcd commits nothing until it <strong>fsyncs</strong> the write-ahead log to disk — so <strong>disk latency is etcd latency</strong>. Below ~10 ms all members are up and stable. Drag it up: slow disk causes <strong>leader elections</strong>, then API timeouts — a cluster that's "all members up" yet unwell.</div>
+  </div>
+
+  <div class="card">
+    <h2>How you'd actually check it</h2>
+    <div class="note"><code>oc rsh -n openshift-etcd etcd-master-0<br>etcdctl endpoint health --cluster&nbsp;&nbsp;&nbsp;# each member: healthy + latency<br>etcdctl endpoint status -w table&nbsp;&nbsp;&nbsp;&nbsp;# leader flag, DB size, raft term</code></div>
+    <div class="note ok" style="margin-top:8px">Prometheus watches <code>etcd_disk_wal_fsync_duration_seconds</code>, <code>etcd_server_leader_changes_seen_total</code>, and <code>etcd_mvcc_db_total_size_in_bytes</code>; platform alerts like <code>etcdHighFsyncDurations</code> and <code>etcdMembersDown</code> page you before it's fatal. <strong>Backup/restore is Module 12.</strong></div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="02-logging-loki.html">← Logging &amp; LogQL</a>
+    <a class="btn primary" href="index.html">Finish: back to all visualizations →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+let N=3, up=[], fsync=3;
+function initMembers(){ up=new Array(N).fill(true); }
+function quorumNeeded(){ return Math.floor(N/2)+1; }
+function upN(){ return up.filter(Boolean).length; }
+function hasQuorum(){ return upN() >= quorumNeeded(); }
+function leaderIdx(){ // first up member is leader (if quorum)
+  if(!hasQuorum()) return -1;
+  return up.indexOf(true);
+}
+function render(){
+  const box=document.getElementById("members"); box.innerHTML="";
+  const lead=leaderIdx();
+  up.forEach((u,i)=>{
+    const m=document.createElement("div");
+    const isLead = (i===lead);
+    m.className="member "+(u?"up":"down")+(isLead?" leader":"");
+    m.innerHTML='<div class="role">'+(u?(isLead?"leader":"follower"):"down")+'</div>'+
+                '<div class="dot">'+(u?(isLead?"👑":"✅"):"❌")+'</div>'+
+                '<div class="name">master-'+i+'</div>'+
+                '<div class="role">etcd</div>';
+    m.addEventListener("click",()=>{ up[i]=!up[i]; render(); });
+    box.appendChild(m);
+  });
+  document.getElementById("upCount").textContent=upN()+" of "+N+" up";
+  document.getElementById("quorum").textContent="quorum: "+quorumNeeded()+" needed";
+  const q=hasQuorum(), slow=fsync>10, veryslow=fsync>20;
+  const api=document.getElementById("apis");
+  if(!q){ api.className="apis warn"; api.textContent="❌ Quorum LOST ("+upN()+" < "+quorumNeeded()+") — API server read-only / cluster unavailable"; }
+  else if(veryslow){ api.className="apis warn"; api.textContent="⚠️ Quorum held, but fsync "+fsync+"ms → leader elections & API timeouts"; }
+  else if(slow){ api.className="apis warn"; api.textContent="⚠️ Quorum held, but disk is slow ("+fsync+"ms) — watch for instability"; }
+  else { api.className="apis ok"; api.textContent="✅ etcd has quorum — API server accepts writes"; }
+  document.getElementById("upCount").className="counter "+(q?"ok":"warn");
+  document.getElementById("quorum").className="counter "+(q?"ok":"warn");
+  // notes
+  if(!q){ document.getElementById("note").innerHTML="🔴 <strong>Quorum lost.</strong> Only "+upN()+" of "+N+" members are up — a <strong>minority</strong>. Raft can't get a majority to agree, so no writes commit: the API goes read-only. Recovering a lost-quorum control plane is a <strong>disaster-recovery</strong> procedure (Module 12)."; }
+  else if(upN()<N){ document.getElementById("note").innerHTML="🟢 <strong>Still healthy.</strong> "+upN()+" of "+N+" up ≥ quorum ("+quorumNeeded()+"). etcd tolerates losing a <strong>minority</strong> ("+(N-quorumNeeded())+" member"+((N-quorumNeeded())===1?"":"s")+"). Fail one more to break it."; }
+  else { document.getElementById("note").innerHTML="Quorum = <strong>majority</strong> = <code>floor(N/2)+1</code> = <strong>"+quorumNeeded()+"</strong>. All "+N+" up. This is why masters come in <strong>odd</strong> numbers: "+N+" tolerates "+(N-quorumNeeded())+" failure"+((N-quorumNeeded())===1?"":"s")+" — the same as an even "+(N+1)+" would, at lower cost."; }
+}
+document.getElementById("fsync").addEventListener("input",e=>{ fsync=parseInt(e.target.value);
+  const v=document.getElementById("fsyncVal"); v.textContent="p99 fsync: "+fsync+" ms"; v.className="counter "+(fsync>10?"warn":"ok");
+  if(fsync>20){ document.getElementById("perfNote").innerHTML="🔴 <strong>"+fsync+" ms fsync.</strong> The leader can't persist the WAL fast enough → followers time it out → <strong>leader elections</strong> churn → API requests stall. Every member is 'up', yet the cluster is sick. Fix = fast local <strong>SSD/NVMe</strong> for etcd."; }
+  else if(fsync>10){ document.getElementById("perfNote").innerHTML="🟠 <strong>"+fsync+" ms fsync</strong> is above the healthy band (~10 ms). etcd is coping but fragile; the <code>etcdHighFsyncDurations</code> alert territory. Slow disk is the #1 cause of a sick etcd."; }
+  else { document.getElementById("perfNote").innerHTML="etcd commits nothing until it <strong>fsyncs</strong> the write-ahead log to disk — so <strong>disk latency is etcd latency</strong>. Below ~10 ms all members are up and stable. Drag it up: slow disk causes <strong>leader elections</strong>, then API timeouts — a cluster that's 'all members up' yet unwell."; }
+  render(); });
+document.getElementById("fiveT").addEventListener("click",()=>{ N = (N===3?5:3);
+  document.getElementById("fiveT").textContent = N===3?"Switch to 5 members":"Switch to 3 members";
+  initMembers(); render(); });
+document.getElementById("reset").addEventListener("click",()=>{ initMembers(); render(); });
+initMembers(); render();
+
+renderQuiz("quiz", [
+  { q: "A 3-member etcd cluster loses one member. What happens to the cluster?",
+    options: ["It immediately goes read-only","Quorum is lost and writes stop","It stays healthy — 2 of 3 is still a majority, so writes continue","A new member is auto-created on a worker node"], answer: 2,
+    explain: "Quorum for 3 members is 2. With 2 of 3 up you still have a majority, so Raft commits writes normally. It's losing the *second* member (leaving 1, a minority) that breaks quorum." },
+  { q: "Why do OpenShift control planes use an odd number of etcd members (3 or 5)?",
+    options: ["Odd numbers are required by the API server","An odd count gives the best failure tolerance per node — N and N+1 (even) tolerate the same failures, so the even one just costs more","Even numbers can't elect a leader","It's only a naming convention with no effect"], answer: 1,
+    explain: "Quorum is floor(N/2)+1. 3 tolerates 1 failure; 4 also tolerates only 1 — but needs 3 up and costs an extra node. Odd counts maximise fault tolerance per member and avoid split-brain ties." },
+  { q: "Every etcd member shows 'up', yet the whole cluster feels slow and the API times out intermittently. What's the most likely cause?",
+    options: ["Too many namespaces","A missing ServiceMonitor","Quorum is lost","Slow disk — high fsync latency causes leader elections that stall Raft and the API"], answer: 3,
+    explain: "etcd can't commit until it fsyncs the WAL to disk, so disk latency is etcd latency. Slow disks trigger leader elections and API timeouts even with all members up — hence etcd wants fast local SSD/NVMe." },
+  { q: "Which metric would you watch to catch that disk-latency problem before it becomes an outage?",
+    options: ["etcd_disk_wal_fsync_duration_seconds (p99) — with the etcdHighFsyncDurations alert","http_requests_total","kube_pod_status_phase","up{job=\"subscriber-api\"}"], answer: 0,
+    explain: "etcd_disk_wal_fsync_duration_seconds tracks how long the fsync takes; its p99 rising past ~10ms is the leading indicator, and OpenShift ships etcdHighFsyncDurations to page you before it cascades." }
+]);
+</script>
+</body>
+</html>

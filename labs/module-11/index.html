@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 11 — Interactive Visualizations | OpenShift Container Platform</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift Container Platform</a>
+  <span class="pill">Module 11 · Monitoring, Logging &amp; etcd</span>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Interactive lab · Self-paced</div>
+    <h1>Monitoring, Logging &amp; etcd — visualized</h1>
+    <p class="lede">Three hands-on visualizations that make Module 11 click — how <strong>Prometheus</strong> turns a metric into an <strong>alert</strong> (and how <code>for:</code> filters blips before Alertmanager pages anyone), how <strong>Loki / LogQL</strong> narrows a flood of logs to the one line that matters, and how <strong>etcd</strong> stays alive on <strong>quorum</strong> — and why a fast disk is non-negotiable. Each ends with a short <strong>self-check</strong> quiz.</p>
+  </div>
+
+  <div class="card">
+    <h2>How to use this</h2>
+    <p class="sub" style="margin:0">Work through the three in order (they trace an incident from alert → logs → ruling out etcd) or jump to any concept. Everything runs in your browser — no install, no internet, no cluster needed. Companion reading: <a href="../../guides/module-11-monitoring-logging-etcd.md"><code>guides/module-11-monitoring-logging-etcd.md</code></a>. Then practice for real with the guided <a href="demos/README.md">demos</a> and <a href="exercises/README.md">exercises</a> (the monitoring stack is built-in; logging is an admin-installed Operator; etcd checks run from the control plane).</p>
+  </div>
+
+  <div class="viz-grid">
+    <a class="viz-card" href="01-monitoring-alerting.html">
+      <span class="ix">01</span>
+      <h3>Monitoring &amp; Alerting</h3>
+      <p>Drag <strong>subscriber-api</strong>'s error rate past the threshold and watch an alert rule move <strong>Inactive → Pending → Firing</strong>, then route through <strong>Alertmanager</strong> by severity.</p>
+      <div class="tags"><span class="tag">Prometheus</span><span class="tag">for:</span><span class="tag">Alertmanager</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="02-logging-loki.html">
+      <span class="ix">02</span>
+      <h3>Logging &amp; LogQL</h3>
+      <p>Build a <strong>LogQL</strong> query — a <strong>stream selector</strong> then <strong>line filters</strong> — and watch a wall of logs collapse to the one <code>connection refused</code> that explains the incident.</p>
+      <div class="tags"><span class="tag">Loki</span><span class="tag">LogQL</span><span class="tag">log types</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="03-etcd-quorum.html">
+      <span class="ix">03</span>
+      <h3>etcd &amp; Quorum</h3>
+      <p>Fail etcd members and watch the API stay up until <strong>quorum</strong> breaks; then push <strong>fsync latency</strong> and see a cluster that's "all up" go sick anyway.</p>
+      <div class="tags"><span class="tag">Raft</span><span class="tag">quorum</span><span class="tag">fsync</span><span class="tag">4 questions</span></div>
+    </a>
+
+    <a class="viz-card" href="01-monitoring-alerting.html" style="border-style:dashed;background:var(--surface-2)">
+      <span class="ix">▶</span>
+      <h3>Start here</h3>
+      <p>New to day-2 operations? Begin with visualization 01 and work straight through — they follow one incident from alert to root cause. ~20–30 minutes total.</p>
+      <div class="tags"><span class="tag">12 questions total</span></div>
+    </a>
+  </div>
+
+  <div class="card" style="margin-top:24px">
+    <h3 style="margin-top:0">What you'll be able to explain afterwards</h3>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li>The built-in <strong>monitoring stack</strong> (Cluster Monitoring Operator, Prometheus, Alertmanager, Thanos) and the metrics/logs division of labour</li>
+      <li>How an alerting rule works — <strong>expression + <code>for:</code></strong>, Pending vs Firing — and how <strong>Alertmanager</strong> groups, routes and silences</li>
+      <li>Why your apps need <strong>user workload monitoring</strong> + a <strong>ServiceMonitor</strong> before you can alert on them</li>
+      <li>The logging pipeline <strong>collect → store → visualize</strong> (Vector → LokiStack → LogQL), the three <strong>log types</strong>, and how to <strong>filter</strong> efficiently</li>
+      <li>Why <strong>etcd quorum</strong> is life-or-death, why masters are <strong>odd-numbered</strong>, and which <strong>health &amp; performance</strong> signals (fsync, leader changes) to watch</li>
+    </ul>
+  </div>
+
+  <div class="card" style="margin-top:6px">
+    <h3 style="margin-top:0">Then take it to a real cluster</h3>
+    <p class="sub" style="margin:0 0 6px">The visualizations build the mental model; these apply it for real (monitoring is built-in; logging is an admin-installed Operator; etcd checks run from the control plane):</p>
+    <ul style="color:var(--ink-soft);margin:0">
+      <li><a href="demos/README.md"><strong>Guided demos</strong></a> — instructor-led tours (explore dashboards + author a PrometheusRule; query &amp; filter logs; verify etcd health &amp; performance).</li>
+      <li><a href="exercises/README.md"><strong>Exercises</strong></a> — you drive, with validation steps and worked solutions, building to a full incident-triage capstone.</li>
+      <li><a href="../../guides/module-11-monitoring-logging-etcd.md"><strong>Concept guide</strong></a> — the deep-dive reference for every object here.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

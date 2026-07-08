@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logging &amp; LogQL — Interactive | Module 11</title>
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .statebar { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+  .counter { font-family:var(--mono); font-weight:800; font-size:14px; padding:5px 11px; border-radius:9px; background:var(--slate-bg); }
+  .counter.ok { background:var(--green-bg); color:var(--green-ink); }
+  .ctl { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:6px 0; }
+  .ctl label { font-size:12.5px; font-weight:700; color:var(--ink-soft); }
+  select, .txt { font-family:var(--mono); font-size:13px; padding:6px 8px; border:2px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink); }
+  .query { font-family:var(--mono); font-size:13px; background:var(--code-bg,#0d1117); color:#e6edf3; padding:10px 12px; border-radius:10px; margin:8px 0; overflow-x:auto; white-space:nowrap; }
+  .query .sel { color:#7ee787; } .query .fil { color:#ffa657; } .query .val { color:#a5d6ff; }
+  .logs { font-family:var(--mono); font-size:12.5px; border:2px solid var(--line); border-radius:10px; max-height:320px; overflow:auto; }
+  .logrow { display:flex; gap:8px; padding:5px 9px; border-bottom:1px solid var(--line); align-items:baseline; }
+  .logrow:last-child { border-bottom:none; }
+  .lvl { font-weight:800; padding:1px 6px; border-radius:6px; font-size:11px; }
+  .lvl.INFO { background:var(--blue-bg); color:var(--blue-ink); }
+  .lvl.WARN { background:#fef7e0; color:#8a6100; }
+  .lvl.ERROR { background:var(--red-bg); color:var(--red-ink); }
+  .ns { color:var(--ink-soft); }
+  .toggle { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border:2px solid var(--line); border-radius:8px; font-size:12.5px; cursor:pointer; }
+  .toggle.on { border-color:var(--blue); background:var(--blue-bg); color:var(--blue-ink); }
+  .types { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .types .box { border:2px solid var(--line); border-radius:10px; padding:10px; font-size:12.5px; }
+  @media (max-width:640px){ .types { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">OpenShift · Module 11</a>
+  <span class="pill">Visualization 2 of 3</span>
+  <span class="spacer"></span>
+  <a class="home" href="index.html">← All visualizations</a>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Concept · Logging &amp; LogQL</div>
+    <h1>Select the streams, then filter the lines.</h1>
+    <p class="lede">Loki stores every container's logs indexed by <strong>labels</strong>. A LogQL query narrows in two moves: a <strong>stream selector</strong> <code>{namespace=…}</code> picks <em>which</em> streams, then <strong>line filters</strong> <code>|=</code> <code>!=</code> <code>|~</code> grep <em>within</em> them. Build a query and watch the log volume collapse from noise to the one line you need.</p>
+  </div>
+
+  <div class="card">
+    <h2>Build a LogQL query</h2>
+    <div class="ctl">
+      <label>stream selector — namespace:</label>
+      <select id="ns">
+        <option value="">{ } (all namespaces)</option>
+        <option value="mobily-apps">mobily-apps</option>
+        <option value="self-care">self-care</option>
+        <option value="openshift-ingress">openshift-ingress</option>
+      </select>
+      <select id="ctr">
+        <option value="">any container</option>
+        <option value="subscriber-api">subscriber-api</option>
+        <option value="subscriber-db">subscriber-db</option>
+        <option value="sms-gateway">sms-gateway</option>
+      </select>
+    </div>
+    <div class="ctl">
+      <label>line filter:</label>
+      <label class="toggle" id="tErr"><input type="checkbox" id="fErr"> |= "ERROR"</label>
+      <label class="toggle" id="tHealth"><input type="checkbox" id="fHealth"> != "/healthz"</label>
+      <label class="toggle" id="tRe"><input type="checkbox" id="fRe"> |~ "timeout|refused"</label>
+    </div>
+    <div class="query" id="query"></div>
+    <div class="statebar"><span class="counter ok" id="count">40 of 40 lines</span></div>
+    <div class="logs" id="logs"></div>
+    <div class="note" id="note" style="margin-top:10px">Start broad, then narrow. Pick a <strong>namespace</strong> to select streams (Loki uses the label index — fast), then add <strong>line filters</strong> to grep the text. Filter <em>before</em> you read: you search kilobytes, not terabytes.</div>
+  </div>
+
+  <div class="card">
+    <h2>Three log types, one pipeline</h2>
+    <div class="types">
+      <div class="box"><strong>application</strong><br><span class="ns">your workloads' stdout/stderr</span><br>→ developers</div>
+      <div class="box"><strong>infrastructure</strong><br><span class="ns">node + openshift-*/kube-* pods</span><br>→ platform / SRE</div>
+      <div class="box"><strong>audit</strong><br><span class="ns">who did what via the API</span><br>→ security</div>
+    </div>
+    <div class="note ok" style="margin-top:10px"><strong>Vector</strong> (collector, per-node DaemonSet) → <strong>LokiStack</strong> (store, indexed by labels) → <strong>console / LogQL</strong> (visualize). A <strong>ClusterLogForwarder</strong> routes each type to its outputs. <code>oc logs</code> is the live, unstored fallback — great for "right now," useless for history.</div>
+  </div>
+
+  <div class="card">
+    <h2>✅ Self-check</h2>
+    <div id="quiz"></div>
+  </div>
+
+  <div class="pager">
+    <a class="btn ghost" href="01-monitoring-alerting.html">← Monitoring &amp; Alerting</a>
+    <a class="btn primary" href="03-etcd-quorum.html">Next: etcd &amp; Quorum →</a>
+  </div>
+</div>
+
+<script src="assets/quiz.js"></script>
+<script>
+const DATA = [
+  {ns:"mobily-apps", ctr:"subscriber-api", lvl:"INFO",  msg:'GET /subscribers/9715xx 200 12ms'},
+  {ns:"mobily-apps", ctr:"subscriber-api", lvl:"INFO",  msg:'GET /healthz 200 1ms'},
+  {ns:"mobily-apps", ctr:"subscriber-api", lvl:"ERROR", msg:'GET /subscribers/9715yy 500 connection refused: subscriber-db:5432'},
+  {ns:"mobily-apps", ctr:"subscriber-api", lvl:"WARN",  msg:'retry 1/3 to subscriber-db timeout'},
+  {ns:"mobily-apps", ctr:"subscriber-db", lvl:"ERROR", msg:'FATAL: out of memory — OOMKilled, restarting'},
+  {ns:"mobily-apps", ctr:"sms-gateway",   lvl:"INFO",  msg:'POST /sms delivered msisdn=9715zz'},
+  {ns:"mobily-apps", ctr:"sms-gateway",   lvl:"WARN",  msg:'queue depth high (820) approaching limit'},
+  {ns:"mobily-apps", ctr:"subscriber-api", lvl:"INFO",  msg:'GET /healthz 200 1ms'},
+  {ns:"self-care",   ctr:"self-care",     lvl:"INFO",  msg:'login ok user=cust_4821'},
+  {ns:"self-care",   ctr:"self-care",     lvl:"ERROR", msg:'topup failed: upstream timeout to billing'},
+  {ns:"self-care",   ctr:"self-care",     lvl:"INFO",  msg:'GET /healthz 200'},
+  {ns:"openshift-ingress", ctr:"router",  lvl:"INFO",  msg:'route self-care 200 8ms'},
+  {ns:"openshift-ingress", ctr:"router",  lvl:"WARN",  msg:'backend subscriber-api connection refused'},
+];
+// expand to ~40 lines by repeating with slight variety
+let LINES=[]; for(let i=0;i<3;i++){ DATA.forEach(d=>LINES.push({...d})); }
+LINES = LINES.slice(0,40);
+
+function buildQuery(ns,ctr,fErr,fHealth,fRe){
+  let sel="{ ";
+  const parts=[];
+  if(ns) parts.push('kubernetes_namespace_name=<span class="val">"'+ns+'"</span>');
+  if(ctr) parts.push('kubernetes_container_name=<span class="val">"'+ctr+'"</span>');
+  sel += parts.join(", ") + " }";
+  let q='<span class="sel">'+sel+'</span>';
+  if(fErr) q+=' <span class="fil">|=</span> <span class="val">"ERROR"</span>';
+  if(fHealth) q+=' <span class="fil">!=</span> <span class="val">"/healthz"</span>';
+  if(fRe) q+=' <span class="fil">|~</span> <span class="val">"timeout|refused"</span>';
+  return q;
+}
+function render(){
+  const ns=document.getElementById("ns").value, ctr=document.getElementById("ctr").value;
+  const fErr=document.getElementById("fErr").checked, fHealth=document.getElementById("fHealth").checked, fRe=document.getElementById("fRe").checked;
+  document.getElementById("tErr").classList.toggle("on",fErr);
+  document.getElementById("tHealth").classList.toggle("on",fHealth);
+  document.getElementById("tRe").classList.toggle("on",fRe);
+  document.getElementById("query").innerHTML = buildQuery(ns,ctr,fErr,fHealth,fRe);
+  const rows = LINES.filter(l=>{
+    if(ns && l.ns!==ns) return false;
+    if(ctr && l.ctr!==ctr) return false;
+    if(fErr && l.msg.indexOf("ERROR")<0 && l.lvl!=="ERROR") return false;
+    if(fHealth && l.msg.indexOf("/healthz")>=0) return false;
+    if(fRe && !/timeout|refused/.test(l.msg)) return false;
+    return true;
+  });
+  const box=document.getElementById("logs"); box.innerHTML="";
+  rows.forEach(l=>{
+    const r=document.createElement("div"); r.className="logrow";
+    r.innerHTML='<span class="lvl '+l.lvl+'">'+l.lvl+'</span><span class="ns">'+l.ns+'/'+l.ctr+'</span><span>'+l.msg.replace(/</g,"&lt;")+'</span>';
+    box.appendChild(r);
+  });
+  const c=document.getElementById("count"); c.textContent=rows.length+" of "+LINES.length+" lines";
+  c.className="counter "+(rows.length<=3?"ok":(rows.length<LINES.length?"":"ok"));
+  const anyFilter = ns||ctr||fErr||fHealth||fRe;
+  if(rows.length===0){ document.getElementById("note").innerHTML="No lines match — the filters are too narrow for this sample. Loosen a line filter; the stream selector still decides which streams are even considered."; }
+  else if(anyFilter){ document.getElementById("note").innerHTML="Narrowed to <strong>"+rows.length+"</strong> line"+(rows.length===1?"":"s")+". The <strong>stream selector</strong> ("+((ns||ctr)?"labels":"none yet")+") uses Loki's index; the <strong>line filters</strong> grep the remaining text. This is exactly how <em>Observe → Logs</em> narrows an incident."; }
+}
+["ns","ctr"].forEach(id=>document.getElementById(id).addEventListener("change",render));
+["fErr","fHealth","fRe"].forEach(id=>document.getElementById(id).addEventListener("change",render));
+render();
+
+renderQuiz("quiz", [
+  { q: "A LogQL query is <code>{namespace=\"mobily-apps\"} |= \"ERROR\"</code>. What role does the <code>{namespace=...}</code> part play?",
+    options: ["It is a line filter that greps text","It is the stream selector — it picks which label-indexed streams to read, before any text grep","It defines a new label on the logs","It sets the time range"], answer: 1,
+    explain: "The {} is the stream selector: it uses Loki's label index to choose streams. |= / != / |~ are line filters that grep text within those streams. Select first, then filter." },
+  { q: "Why does Loki index only labels (namespace, pod, container) instead of full-text indexing every word like Elasticsearch?",
+    options: ["Because it cannot search text at all","Because labels are the only data it stores","Because it makes queries slower on purpose","Because label-only indexing is far cheaper to run; raw lines sit in object storage and are grepped on read"], answer: 3,
+    explain: "Loki is 'Prometheus for logs': a small label index + cheap object storage for the raw lines. You narrow by label (cheap), then grep the much smaller result — low cost, fast filtering." },
+  { q: "OpenShift logging separates streams into three types. Which set is correct?",
+    options: ["application, infrastructure, audit","error, warning, info","stdout, stderr, syslog","metrics, logs, traces"], answer: 0,
+    explain: "application (your workloads), infrastructure (node + openshift-*/kube-* pods), and audit (who did what via the API). Separating them lets RBAC, routing, and retention differ per type." },
+  { q: "When is <code>oc logs deploy/subscriber-api</code> the right tool instead of the LokiStack / Observe → Logs query?",
+    options: ["When you need logs from a pod that was deleted last week","When you want to search across all namespaces at once","For the live tail of a currently-running pod — the unstored 'right now' view","When you need the audit trail for compliance"], answer: 2,
+    explain: "oc logs reads a running pod's current log straight from the node — great for 'right now,' but there's no store, so history vanishes when the pod dies. Loki is what keeps searchable history." }
+]);
+</script>
+</body>
+</html>
