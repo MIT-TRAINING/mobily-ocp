@@ -14,6 +14,10 @@
 
 ## Tasks
 
+> This repo ships a local stand-in for the `self-care.git` GitOps source at
+> [`../demos/self-care-gitops/`](../demos/self-care-gitops/) (`base/` + `overlays/prod/`) —
+> `cd` there before running `oc kustomize`.
+
 1. **Offline:** render the GitOps source with `oc kustomize overlays/prod` and confirm the
    `replicas`/`image` it would apply.
 2. Create an Argo CD **Application** pointing at the repo/path with `automated` sync +
@@ -25,15 +29,32 @@
 > **Hint (Task 2):** the Application lives in `openshift-gitops`; `spec.source` = repo/path/
 > targetRevision, `spec.destination` = server + namespace.
 
+> **Hint (Task 2, easy to miss):** on OpenShift GitOps, the *destination* namespace needs
+> the label `argocd.argoproj.io/managed-by: openshift-gitops` **before** you create the
+> Application — that label is what grants the `openshift-gitops-argocd-application-controller`
+> service account RBAC to create objects there. Without it, sync sticks at `OutOfSync` /
+> `Missing` with a `deployments.apps is forbidden` error in `.status.operationState.message`.
+
 ---
 
 ## Validation
 
 ```bash
+cd ../demos/self-care-gitops                                       # local stand-in repo
 oc kustomize overlays/prod | grep -E 'replicas:|image:'            # offline preview
 oc get application self-care -n openshift-gitops                   # Synced / Healthy
 oc scale deploy self-care -n self-care-prod --replicas=3; sleep 10
 oc get deploy self-care -n self-care-prod -o jsonpath='{.spec.replicas}{"\n"}'   # reverts to Git value
+```
+
+**Verified output** *(live cluster, OCP 4.18, run 2026-07-16 — real GitHub repo, real Argo CD):*
+
+```
+  replicas: 6
+      - image: registry.access.redhat.com/ubi9/httpd-24:latest
+NAME        SYNC STATUS   HEALTH STATUS
+self-care   Synced        Healthy
+6        # selfHeal reverted the oc scale --replicas=3 back to Git's value
 ```
 
 ---
@@ -51,9 +72,15 @@ oc get deploy self-care -n self-care-prod -o jsonpath='{.spec.replicas}{"\n"}'  
 
 ```bash
 # 1. Preview the GitOps source (OFFLINE)
+cd ../demos/self-care-gitops                                       # local stand-in repo
 oc kustomize overlays/prod | grep -E 'replicas:|image:'
 
-# 2. Application (in openshift-gitops)
+# 2. Destination namespace needs the managed-by label BEFORE the Application syncs
+oc create namespace self-care-prod
+oc label namespace self-care-prod argocd.argoproj.io/managed-by=openshift-gitops
+
+# Application (in openshift-gitops) — point repoURL at your own fork in a real class;
+# this is the actual repo used to validate this exercise:
 oc apply -f - <<'EOF'
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -61,7 +88,7 @@ metadata: { name: self-care, namespace: openshift-gitops }
 spec:
   project: default
   source:
-    repoURL: https://git.mobily.example/self-care.git
+    repoURL: https://github.com/MIT-TRAINING/self-care-gitops.git
     targetRevision: main
     path: overlays/prod
   destination: { server: https://kubernetes.default.svc, namespace: self-care-prod }
@@ -82,24 +109,31 @@ oc get deploy self-care -n self-care-prod -o jsonpath='{.spec.replicas}{"\n"}'  
 oc delete application self-care -n openshift-gitops
 ```
 
-**Representative output** *(oc kustomize verified offline; Argo steps need a cluster — OCP 4.18):*
+**Verified output** *(live cluster, OCP 4.18, run 2026-07-16 — real GitHub repo, real Argo CD):*
 
 ```
   replicas: 6
       - image: registry.access.redhat.com/ubi9/httpd-24:latest
+namespace/self-care-prod created
+namespace/self-care-prod labeled
 NAME        SYNC STATUS   HEALTH STATUS
 self-care   Synced        Healthy
-6        # selfHeal reverted the oc scale
+6        # selfHeal reverted the oc scale --replicas=3 back to Git's value
 ```
 
 **Key point:** Git is the source of truth; Argo CD reconciles the cluster to it. `selfHeal`
 undoes direct cluster edits (drift); rollback is `git revert`. `oc kustomize` shows exactly
-what Argo's repo-server will render — offline.
+what Argo's repo-server will render — offline. The `managed-by` namespace label isn't
+optional on OpenShift GitOps — skip it and sync silently sticks at `OutOfSync`.
 </details>
 
 ---
 
-> **◐ Partially verified — `oc kustomize` VERIFIED offline (oc 4.22); Argo steps
-> representative.** The GitOps source render (Task 1) is real. Application sync/drift/
-> self-heal **require a live cluster + GitOps Operator** and are **representative of
-> OpenShift 4.18** — validate when the cluster is up (Application as a project user).
+> **✓ Fully verified — every task run live on OCP 4.18, 2026-07-16.** The offline
+> `oc kustomize` render (Task 1), the Application create/sync (Task 2-3), and the drift/
+> self-heal round-trip (Task 4) were all run against the real
+> [`MIT-TRAINING/self-care-gitops`](https://github.com/MIT-TRAINING/self-care-gitops) repo
+> and a real `openshift-gitops` instance — this is the same mechanism validated in
+> [Demo 1](../demos/demo-01-gitops-argocd.md), including the `managed-by` namespace-label
+> finding. Point `repoURL` at your own fork for class use; the cluster/namespace were left
+> clean afterward.

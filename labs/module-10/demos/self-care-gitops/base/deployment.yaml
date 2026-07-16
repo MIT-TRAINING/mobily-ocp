@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: self-care
+  labels:
+    app: self-care
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: self-care
+  template:
+    metadata:
+      labels:
+        app: self-care
+    spec:
+      containers:
+        - name: self-care
+          image: registry.access.redhat.com/ubi9/httpd-24:latest
+          ports:
+            - containerPort: 8080

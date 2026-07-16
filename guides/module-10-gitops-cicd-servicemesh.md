@@ -342,8 +342,13 @@ flowchart TB
   of services — the mesh's complexity may outweigh the benefit; Routes + NetworkPolicies
   (Module 6) may suffice.
 - **On OpenShift:** OSSM is installed via Operators (Service Mesh + Kiali + distributed
-  tracing); a `ServiceMeshControlPlane` defines the mesh and `ServiceMeshMemberRoll` lists
-  the member namespaces.
+  tracing). **Two generations exist and shape the mesh differently:** classic **OSSM 2.x**
+  defines the mesh with a `ServiceMeshControlPlane` and lists member namespaces in a
+  `ServiceMeshMemberRoll`; the current **OSSM 3.x** (Sail-operator-based) drops both —
+  the mesh is a plain `Istio` CR, and a namespace joins simply by carrying the
+  `istio-injection: enabled` label, same as vanilla upstream Istio. Confirm which your
+  cluster runs (`oc get csv -A | grep -i servicemesh`) before assuming either shape — the
+  Module 10 demos/exercises are written for **3.x**.
 
 ---
 
@@ -375,8 +380,10 @@ flowchart TB
   is unaware.
 - **Control plane** — **Istiod** — takes your high-level intent (routing rules, mTLS
   policy) and programs every sidecar.
-- **Sidecar injection** — label a namespace (or annotate a pod) and the mesh **auto-injects**
-  the Envoy container. `oc get pod` then shows **2/2 READY** (app + sidecar).
+- **Sidecar injection** — label a namespace (`istio-injection: enabled`, OSSM 3.x/vanilla
+  Istio — or annotate a pod on OSSM 2.x) and the mesh **auto-injects** the Envoy container.
+  `oc get pod` then shows **2/2 READY** (app + sidecar). **Existing** pods only pick up
+  injection on their next rollout — label first, then create/restart the Deployment.
 - **Cost:** a proxy per pod adds memory/latency and operational complexity — the trade for
   uniform security/routing/observability.
 
@@ -491,7 +498,8 @@ delivery on OpenShift — and the backbone of the Module 12 capstone.
 | **PeerAuthentication** | mTLS policy (e.g. STRICT) between services. |
 | **Kiali** | The mesh's service-graph / observability console. |
 | **Canary / blue-green** | Progressive release strategies via traffic weighting. |
-| **ServiceMeshControlPlane / MemberRoll** | Defines the mesh / its member namespaces. |
+| **ServiceMeshControlPlane / MemberRoll** | OSSM **2.x** only: CRs that define the mesh / list its member namespaces. |
+| **Istio (CR)** | OSSM **3.x** (Sail operator): the control-plane-defining CR, replacing SMCP — no MemberRoll; membership is a namespace label. |
 
 ---
 
@@ -505,7 +513,8 @@ delivery on OpenShift — and the backbone of the Module 12 capstone.
   <https://docs.openshift.com/pipelines/latest/about/understanding-openshift-pipelines.html>
 - GitOps principles (OpenGitOps):
   <https://opengitops.dev/>
-- OpenShift Service Mesh:
+- OpenShift Service Mesh (2.x docs — check the docs site's version switcher for the 3.x
+  equivalent, since this module's demos/exercises target 3.x):
   <https://docs.openshift.com/container-platform/latest/service_mesh/v2x/ossm-about.html>
 - Istio traffic management:
   <https://istio.io/latest/docs/concepts/traffic-management/>

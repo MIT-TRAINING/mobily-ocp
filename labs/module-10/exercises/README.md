@@ -19,6 +19,12 @@ are installed as **Operators** (Module 9).
 > **CLIs:** `argocd` (Argo CD), `tkn` (Tekton). `oc kustomize` renders the GitOps source
 > **without a cluster** — great for previewing what Argo will apply.
 
+> ⚠️ **Service Mesh fork:** this cluster's catalog offers both classic OSSM 2.x
+> (`ServiceMeshControlPlane`/`ServiceMeshMemberRoll`) and OSSM 3.x (Sail-operator-based, a
+> plain `Istio` CR + namespace-label injection, **no** SMCP/MemberRoll). Exercise 3 is
+> written for **3.x** (`oc get csv -A | grep -i servicemesh` to check which your cluster has)
+> — see [Demo 3](../demos/demo-03-service-mesh.md) for the full install/mechanics writeup.
+
 ## Exercises in this module
 
 | # | Exercise | What you'll practice | Telecom scenario | Difficulty |
@@ -56,8 +62,12 @@ Companion material: the guided [demos](../demos/README.md), the interactive
 
 ---
 
-> **◐ Partially verified (cluster asleep at authoring).** `oc kustomize` (GitOps source
-> rendering) was run **live offline** (real). Steps needing a **live cluster + Operators**
-> (Argo sync, PipelineRun, mesh routing) are **representative of OpenShift 4.18** and can be
-> validated when the cluster is up (Application/pipeline/mesh CRs as a project user;
-> Operator install + mesh control plane as admin).
+> **✓ Fully verified — all three exercises validated live on OCP 4.18, 2026-07-16.**
+> Exercise 1 (`oc kustomize` render + real Argo CD Application + drift/self-heal), Exercise 2
+> (the full Tekton chain: custom Tasks, cluster-resolver `taskRef`s, real Buildah build/push,
+> real GitOps-repo commit), and Exercise 3 (real mesh-canary mechanics plus the GitOps+mesh+
+> mTLS integration seam) were each run against the live shared cluster with real repos — see
+> each exercise's own verification banner for exactly what was tested and with which concrete
+> artifacts. Exercise 2's Task 7 (Argo hand-off) and Exercise 3's Task 1 (CI) reuse mechanics
+> proven live elsewhere (Demo 2 / Exercise 2) rather than re-running against a fabricated
+> repo — read those banners before assuming 100% of every command was re-executed verbatim.

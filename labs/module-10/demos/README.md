@@ -42,7 +42,8 @@ All scenarios use a **telecom domain** framing (a `self-care` portal via GitOps,
 ```bash
 oc login https://api.<cluster-domain>:6443 -u <user> -p "$OCP_PASSWORD"   # or token
 oc whoami
-oc get csv -A | grep -Ei 'gitops|pipelines|servicemesh'   # Operators present? (else install via OperatorHub)
+oc get ns openshift-gitops 2>&1                            # NotFound → Operator never installed
+oc get csv -A | grep -Ei 'gitops|pipelines|servicemesh'     # Operators present + Succeeded?
 oc get route -n openshift-gitops openshift-gitops-server -o jsonpath='{.spec.host}{"\n"}' 2>/dev/null  # Argo CD URL
 ```
 
@@ -51,6 +52,18 @@ oc get route -n openshift-gitops openshift-gitops-server -o jsonpath='{.spec.hos
 > need cluster-admin. Keep the **Argo CD UI** and **Kiali** open beside the terminal; the
 > topology/graph views make sync and traffic-split land visually. `oc kustomize` renders the
 > GitOps source **offline** — handy to show "what Argo will apply."
+
+> **If `openshift-gitops` namespace is missing**, the GitOps Operator was never installed —
+> see [Demo 1, Step 0](demo-01-gitops-argocd.md#step-0--install-the-operator-cluster-admin-one-time)
+> for the exact Subscription manifest (verified live on OCP 4.18). Pipelines follows the same
+> Subscription pattern with `name: openshift-pipelines-operator-rh`. Service Mesh is
+> different: this cluster's catalog carries **both** classic OSSM 2.x
+> (`name: servicemeshoperator`, `ServiceMeshControlPlane`/`ServiceMeshMemberRoll`) **and**
+> OSSM 3.x (`name: servicemeshoperator3`, Sail-operator-based, no SMCP/MemberRoll — a plain
+> `Istio` CR + namespace-label injection). [Demo 3](demo-03-service-mesh.md) and
+> [Exercise 3](../exercises/exercise-03-capstone.md) are validated against **3.x** — confirm
+> which one your shared cluster actually installed
+> (`oc get csv -A | grep -i servicemesh`) before class.
 
 ---
 
