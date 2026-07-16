@@ -259,7 +259,7 @@ flowchart TB
         J["Jenkins controller + agents<br/>Jenkinsfile (Groovy) · plugins"]
     end
     subgraph TEK["OpenShift Pipelines (Tekton)"]
-        T["Kubernetes-native · serverless<br/>Pipeline/Task CRs · each step a pod"]
+        T["Kubernetes-native · serverless<br/>Pipeline/Task CRs · each Task its own pod"]
     end
     style JENK fill:#fff3cd,stroke:#ff9800,stroke-width:1px,color:#1a1a1a
     style TEK fill:#e6f4ea,stroke:#34a853,stroke-width:1px,color:#1a1a1a
@@ -269,8 +269,9 @@ flowchart TB
   (checkout → build → test → image → push); rich plugin ecosystem; a long-running
   controller + agents. Mobily likely already runs Jenkins.
 - **OpenShift Pipelines (Tekton)** — the **Kubernetes-native**, **serverless** option:
-  **Pipeline** and **Task** are CRDs, each step runs in its **own pod**, nothing runs when
-  idle. Installed via the **OpenShift Pipelines Operator**; drive with `tkn` or the console.
+  **Pipeline** and **Task** are CRDs; each **Task** runs as its **own pod** (its steps run
+  sequentially as containers *inside* that one pod), nothing runs when idle. Installed via
+  the **OpenShift Pipelines Operator**; drive with `tkn` or the console.
 - **Building images in-cluster:** use **Buildah**/**S2I** (Module 1's rootless build
   lineage) as a pipeline task — no Docker daemon.
 - **Choosing:** keep **Jenkins** where teams have investment/plugins; prefer **Tekton** for
