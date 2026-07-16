@@ -111,14 +111,19 @@ route.route.openshift.io/subscriber-api   subscriber-api-mod9-demos.apps.<domain
 
 ## Step 4 — Kustomize: one base, dev vs prod
 
+> This repo ships a runnable sample at
+> [`subscriber-api-manifests/`](subscriber-api-manifests/) — `base/deployment.yaml` +
+> `overlays/dev` + `overlays/prod` (prod patches replicas 1→6 and pins the image tag).
+
 ```bash
-# base/kustomization.yaml + base/deployment.yaml ; overlays/dev + overlays/prod patch it
+cd labs/module-09/demos/subscriber-api-manifests
 oc kustomize overlays/dev    | grep -E 'replicas|image'
 oc kustomize overlays/prod   | grep -E 'replicas|image'
 oc apply -k overlays/prod
 ```
 
-**Expected output** *(requires a cluster to apply; `oc kustomize` renders offline — representative):*
+**Verified output** *(`oc kustomize` run offline against `subscriber-api-manifests/`,
+2026-07-14; `oc apply -k` requires a live cluster — representative):*
 
 ```
 # dev
@@ -131,6 +136,12 @@ oc apply -k overlays/prod
 
 > **Narrate:** One **base**, two tiny **overlays** (replicas + image tag). No templating,
 > no copy-paste — and it's the pattern GitOps (Module 10) applies straight from Git.
+
+> ⚠️ `1.0-prod` is an **illustrative tag**, not a real one on `registry.access.redhat.com` —
+> it exists to show the overlay pinning a version. If you actually `oc apply -k
+> overlays/prod`, the pod will sit in `ImagePullBackOff`; swap in a real tag (e.g. `latest`)
+> to get a running pod, or point this out as the teaching moment ("prod pins an exact
+> version; dev floats on `latest`").
 
 ---
 
@@ -159,9 +170,11 @@ route.route.openshift.io "subscriber-api" deleted
 
 ---
 
-> **◐ Partially verified — Step 1 VERIFIED, cluster steps representative.** The
-> `oc create … --dry-run=client -o yaml` scaffold (Step 1) was **run live offline with oc
-> 4.22** — that YAML is real. Steps that touch the API (`oc apply`, `oc expose`,
-> `oc apply -k`) **require a live cluster** and are **representative of OpenShift 4.18**;
-> a normal user can validate them in their own project when the cluster is up. The
-> `apply`-idempotent / `create`-AlreadyExists behaviour is real and documented.
+> **◐ Partially verified — Steps 1 & 4 (`oc kustomize`) VERIFIED, cluster-apply steps
+> representative.** The `oc create … --dry-run=client -o yaml` scaffold (Step 1) and the
+> `oc kustomize overlays/dev|prod` renders (Step 4) were **run live offline with oc 4.22
+> against the checked-in [`subscriber-api-manifests/`](subscriber-api-manifests/) sample**
+> on 2026-07-14 — that YAML is real, byte-for-byte. Steps that touch the API (`oc apply`,
+> `oc expose`, `oc apply -k`) **require a live cluster** and are **representative of
+> OpenShift 4.18**; a normal user can validate them in their own project when the cluster is
+> up. The `apply`-idempotent / `create`-AlreadyExists behaviour is real and documented.

@@ -125,8 +125,11 @@ variants from one source — the exact pattern GitOps applies from Git (Module 1
 
 ---
 
-> **◐ Partially verified — scaffold VERIFIED offline (oc 4.22), cluster steps
-> representative.** `oc create … --dry-run=client -o yaml` was run live offline (real YAML).
-> `oc apply`/`oc expose`/`oc apply -k`/`curl` **require a live cluster** and are
-> **representative of OpenShift 4.18** — runnable by a normal user in their own project when
-> the cluster is up. The `apply` vs `create` behaviour and `httpd-24` 403 are real.
+> **◐ Partially verified — scaffold + Kustomize solution (Tasks 1, 4) VERIFIED offline,
+> cluster steps representative.** `oc create … --dry-run=client -o yaml` and the full
+> Task 4 solution (the `mkdir`/heredoc base+overlays, then `oc kustomize overlays/dev|prod`)
+> were **run live offline with oc 4.22 end-to-end** on 2026-07-14 — the heredocs produce
+> exactly the replicas/image output shown, byte-for-byte. `oc apply`/`oc expose`/
+> `oc apply -k`/`curl` **require a live cluster** and are **representative of OpenShift
+> 4.18** — runnable by a normal user in their own project when the cluster is up. The
+> `apply` vs `create` behaviour and `httpd-24` 403 are real.

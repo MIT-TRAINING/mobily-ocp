@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscriber-api
+  labels:
+    app: subscriber-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: subscriber-api
+  template:
+    metadata:
+      labels:
+        app: subscriber-api
+    spec:
+      containers:
+        - name: subscriber-api
+          image: registry.access.redhat.com/ubi9/httpd-24:latest
+          ports:
+            - containerPort: 8080

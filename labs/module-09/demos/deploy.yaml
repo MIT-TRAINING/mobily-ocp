@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: subscriber-api
+  name: subscriber-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: subscriber-api
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: subscriber-api
+    spec:
+      containers:
+      - image: registry.access.redhat.com/ubi9/httpd-24:latest
+        name: httpd-24
+        resources: {}
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: subscriber-api
+  name: subscriber-api
+spec:
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: subscriber-api
+status:
+  loadBalancer: {}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  labels:
+    app: subscriber-api
+  name: subscriber-api
+spec:
+  to:
+    kind: Service
+    name: subscriber-api
+  port:
+    targetPort: 8080

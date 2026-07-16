@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscriber-api
+spec:
+  replicas: 6
+  template:
+    spec:
+      containers:
+        - name: subscriber-api
+          image: registry.access.redhat.com/ubi9/httpd-24:1.0-prod
