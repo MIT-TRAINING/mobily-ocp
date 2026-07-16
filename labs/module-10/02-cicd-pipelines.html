@@ -70,7 +70,7 @@
 <script src="assets/quiz.js"></script>
 <script>
 const ENG={
-  Tekton:"<strong>OpenShift Pipelines (Tekton).</strong> Kubernetes-native &amp; serverless — Pipeline/Task are CRDs, each step runs in its own pod, nothing runs when idle. Installed via the Pipelines Operator; driven by <code>tkn</code> or the console.",
+  Tekton:"<strong>OpenShift Pipelines (Tekton).</strong> Kubernetes-native &amp; serverless — Pipeline/Task are CRDs, each Task runs as its own pod (steps run sequentially as containers inside it), nothing runs when idle. Installed via the Pipelines Operator; driven by <code>tkn</code> or the console.",
   Jenkins:"<strong>Jenkins.</strong> The incumbent server-based CI — a Jenkinsfile (Groovy) defines stages, with a huge plugin ecosystem and a long-running controller + agents. Common where teams have existing investment."
 };
 const eng=document.getElementById("engine");
@@ -118,7 +118,7 @@ renderQuiz("quiz", [
     explain: "Separating source from deployment manifests gives a clean, auditable deploy history and means the pipeline only pushes to Git/registry — never holding cluster credentials." },
   { q: "Which is a Kubernetes-native, serverless pipeline option on OpenShift?",
     options: ["A Jenkins controller","Cron jobs","A Bash script on a bastion","OpenShift Pipelines (Tekton)"], answer: 3,
-    explain: "Tekton (OpenShift Pipelines) is Kubernetes-native and serverless — Pipeline/Task CRDs, each step a pod, nothing running when idle. Jenkins is server-based." }
+    explain: "Tekton (OpenShift Pipelines) is Kubernetes-native and serverless — Pipeline/Task CRDs, each Task its own pod, nothing running when idle. Jenkins is server-based." }
 ]);
 </script>
 </body>
