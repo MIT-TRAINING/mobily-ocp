@@ -14,6 +14,11 @@
 > ⚠️ Installing Logging/Loki is admin. Querying logs for namespaces you can read is a
 > project-user action (Observe → Logs is RBAC-scoped).
 
+> 🔧 **Prerequisite — not yet installed on this training cluster.** Checked live
+> (`oc get csv -A | grep -Ei 'cluster-logging|loki'` → no results): the Operators are
+> catalog-available but not deployed here yet, so `openshift-logging`/LokiStack don't exist.
+> Ask your instructor to install them before attempting this exercise live.
+
 ---
 
 ## Tasks
@@ -54,8 +59,8 @@ surfaces `subscriber-api`'s `connection refused: subscriber-db` line.
 
 ## Reflection
 
-- Which part of `{namespace="self-care"} |= "ERROR"` uses Loki's **index**, and which greps
-  raw text? Why does the order (select, then filter) matter for cost?
+- Which part of `{kubernetes_namespace_name="self-care"} |= "ERROR"` uses Loki's **index**, and
+  which greps raw text? Why does the order (select, then filter) matter for cost?
 - Why keep **audit** logs as a separate type from **application** logs?
 - You need "what did this pod log last Tuesday." Does `oc logs` help? What does?
 
@@ -104,9 +109,11 @@ RBAC and retention than developer application logs.
 
 ---
 
-> **◐ Partially verified:** LogQL/`oc logs` **syntax** follows the Logging 6.x / oc 4.22
-> reference; every step **requires a live cluster with the Logging + Loki Operators** and was
-> not run at authoring (cluster asleep/unreachable). Output is **representative of OpenShift
-> 4.18**; the `kubernetes_namespace_name`/`kubernetes_container_name` labels match Logging 6.x.
-> Validate when the cluster is up (Operator/LokiStack install as admin; queries as a project
-> user).
+> **◐ Partially verified:** the cluster is live (`oc 4.22.0` against OCP 4.18.45), and
+> **the Logging + Loki Operators are confirmed not installed** on it (`oc get csv -A` for
+> `cluster-logging`/`loki-operator` returns nothing — live check, not just "cluster
+> unreachable"). LogQL/`oc logs` syntax (`|= != |~`, `kubernetes_namespace_name`,
+> `kubernetes_container_name`) was checked against the Logging 6.2 API reference rather than
+> run, since standing up the stack needs backing object storage and is a real, costed,
+> cluster-admin prerequisite — **install the Operators + LokiStack before assigning this
+> exercise**. Queries themselves are a project-user action once that's done.

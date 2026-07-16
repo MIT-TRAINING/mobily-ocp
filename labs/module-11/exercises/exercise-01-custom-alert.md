@@ -19,7 +19,19 @@
 ## Tasks
 
 1. Confirm user workload monitoring is on (ask your instructor/admin if not) — there should be
-   `prometheus-user-workload-*` pods in `openshift-user-workload-monitoring`.
+   `prometheus-user-workload-*` pods in `openshift-user-workload-monitoring`:
+   ```bash
+   oc -n openshift-user-workload-monitoring get pods
+   ```
+   On the shared training cluster this is already enabled (confirmed live):
+   ```
+   NAME                                   READY   STATUS    RESTARTS   AGE
+   prometheus-operator-655cbbf5d9-vc8hr   2/2     Running   2          8h
+   prometheus-user-workload-0             6/6     Running   6          8h
+   prometheus-user-workload-1             6/6     Running   6          8h
+   thanos-ruler-user-workload-0           4/4     Running   4          8h
+   thanos-ruler-user-workload-1           4/4     Running   4          8h
+   ```
 2. Author a **ServiceMonitor** in `mobily-apps` that scrapes a Service labelled
    `app: subscriber-api` on port `web`, path `/metrics`, every 30s. **Render it offline first**
    with `--dry-run=client -o yaml`, then apply.
@@ -137,8 +149,12 @@ condition. `for: 0m` would fire on a single bad scrape (a blip) — noisy and un
 
 ---
 
-> **◐ Partially verified:** the **ServiceMonitor/PrometheusRule renders**
-> (`oc create --dry-run=client -o yaml`) were **run live offline with oc 4.22** — real output.
-> Steps needing a **live cluster** (UWM pods, `up` metric, Observe → Alerting state) are
-> **representative of OpenShift 4.18**; enabling UWM is admin, the CRs are project-user
-> actions. Validate when the cluster is up.
+> **◐ Partially verified:** re-checked live against `mobily-ocp-training` (OCP 4.18.45,
+> `oc 4.22.0`). Task 1's UWM pod list above is **real, current output** — user workload
+> monitoring is already enabled on this shared cluster. The **ServiceMonitor/PrometheusRule
+> renders** (`oc create --dry-run=client -o yaml`) were **run live offline** — also real
+> output. Tasks 2–5 (applying the CRs for real, seeing `up{job="subscriber-api"}` = 1, and
+> watching the alert move Inactive → Pending → Firing) stay **representative by design**: they
+> depend on *your* `subscriber-api` Service actually existing and being scraped — that's the
+> task this exercise is asking you to do, not something pre-verified for you. Try it, then
+> compare against the Solution's real render.

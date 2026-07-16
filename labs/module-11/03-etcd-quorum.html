@@ -64,7 +64,7 @@
 
   <div class="card">
     <h2>How you'd actually check it</h2>
-    <div class="note"><code>oc rsh -n openshift-etcd etcd-master-0<br>etcdctl endpoint health --cluster&nbsp;&nbsp;&nbsp;# each member: healthy + latency<br>etcdctl endpoint status -w table&nbsp;&nbsp;&nbsp;&nbsp;# leader flag, DB size, raft term</code></div>
+    <div class="note"><code>oc -n openshift-etcd get pods -l app=etcd&nbsp;&nbsp;&nbsp;# real pod names are node-hostname-derived<br>oc -n openshift-etcd exec &lt;etcd-pod&gt; -c etcdctl -- etcdctl endpoint health --cluster<br>oc -n openshift-etcd exec &lt;etcd-pod&gt; -c etcdctl -- etcdctl endpoint status -w table</code></div>
     <div class="note ok" style="margin-top:8px">Prometheus watches <code>etcd_disk_wal_fsync_duration_seconds</code>, <code>etcd_server_leader_changes_seen_total</code>, and <code>etcd_mvcc_db_total_size_in_bytes</code>; platform alerts like <code>etcdHighFsyncDurations</code> and <code>etcdMembersDown</code> page you before it's fatal. <strong>Backup/restore is Module 12.</strong></div>
   </div>
 

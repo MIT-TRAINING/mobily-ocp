@@ -39,42 +39,56 @@ oc -n openshift-etcd get pods -l app=etcd -o wide
 oc get etcd cluster -o jsonpath='{.status.conditions[?(@.type=="EtcdMembersAvailable")].message}{"\n"}'
 ```
 
-**Expected output** *(requires a cluster + admin — representative of OCP 4.18):*
+**Verified output** *(live, `oc 4.22.0` against OCP 4.18.45):*
 
 ```
-NAME                   READY   STATUS    NODE
-etcd-master-0          4/4     Running   master-0
-etcd-master-1          4/4     Running   master-1
-etcd-master-2          4/4     Running   master-2
+NAME                                               READY   STATUS    RESTARTS   AGE   IP            NODE
+etcd-ip-10-0-23-236.ap-south-1.compute.internal   5/5     Running   45         10d   10.0.23.236   ip-10-0-23-236.ap-south-1.compute.internal
+etcd-ip-10-0-61-153.ap-south-1.compute.internal   5/5     Running   45         10d   10.0.61.153   ip-10-0-61-153.ap-south-1.compute.internal
+etcd-ip-10-0-93-108.ap-south-1.compute.internal   5/5     Running   45         10d   10.0.93.108   ip-10-0-93-108.ap-south-1.compute.internal
 3 members are available
 ```
 
 > **Narrate:** Three etcd pods, one per master — that's the 3-member quorum group. The **etcd
 > Operator** reports `EtcdMembersAvailable`. Odd count on purpose: 3 tolerates 1 failure at
 > lower cost than 4 would.
+>
+> Pod names here are the real AWS instance hostnames (`etcd-ip-10-0-...`), not the tidy
+> `etcd-master-0/1/2` you might expect — that naming is cluster-specific (IPI on AWS derives
+> node names from the instance), so expect different literal names on a different cluster; the
+> shape (3 pods, one per master, `READY` counting containers in the static pod) is what
+> transfers. `READY` is `5/5` here (etcd + etcdctl + etcd-metrics + etcd-readyz + setup
+> containers on this build), not the `4/4` an older etcd Operator version reports — check the
+> container count on your own cluster rather than assuming a fixed number.
 
 ---
 
 ## Step 2 — Check endpoint health (quorum view)
 
 ```bash
-# exec into one etcd pod; etcdctl is preconfigured with the client certs inside:
-oc -n openshift-etcd rsh etcd-master-0
-# inside the pod:
-etcdctl endpoint health --cluster -w table
+# exec straight into the etcdctl container of one etcd pod — it's preconfigured with the
+# client certs, so no manual --cert/--key/--cacert flags are needed:
+oc -n openshift-etcd exec etcd-ip-10-0-23-236.ap-south-1.compute.internal -c etcdctl -- \
+  etcdctl endpoint health --cluster -w table
 ```
 
-**Expected output** *(requires a cluster + admin — representative):*
+**Verified output** *(live, `oc 4.22.0` against OCP 4.18.45):*
 
 ```
-+------------------------------+--------+-------------+-------+
-|           ENDPOINT           | HEALTH |    TOOK     | ERROR |
-+------------------------------+--------+-------------+-------+
-| https://10.0.0.10:2379       |  true  |  4.812ms    |       |
-| https://10.0.0.11:2379       |  true  |  5.109ms    |       |
-| https://10.0.0.12:2379       |  true  |  4.640ms    |       |
-+------------------------------+--------+-------------+-------+
++--------------------------+--------+-------------+-------+
+|         ENDPOINT         | HEALTH |    TOOK     | ERROR |
++--------------------------+--------+-------------+-------+
+| https://10.0.23.236:2379 |   true | 16.598781ms |       |
+| https://10.0.61.153:2379 |   true | 21.567276ms |       |
+| https://10.0.93.108:2379 |   true | 24.425999ms |       |
++--------------------------+--------+-------------+-------+
 ```
+
+> **Narrate on the tool choice:** `oc exec -c etcdctl` runs the command directly instead of
+> dropping into an interactive shell first — same result, easier to script/repeat. The pod has
+> 5 containers (`etcdctl etcd etcd-metrics etcd-readyz etcd-rev`, matching the `5/5` from
+> Step 1); a bare `oc rsh etcd-<node>` lands you in `etcd` (the pod's default container), so
+> for interactive use you'd want `oc rsh -c etcdctl etcd-<node>` instead.
 
 > **Narrate:** Every endpoint `true` and low `TOOK` = all members healthy and responsive. If
 > one showed `false`, we'd still have **2 of 3 = quorum** and the cluster would keep serving;
@@ -85,26 +99,28 @@ etcdctl endpoint health --cluster -w table
 ## Step 3 — Endpoint status (leader, DB size, raft term)
 
 ```bash
-# still inside the etcd pod:
-etcdctl endpoint status --cluster -w table
+oc -n openshift-etcd exec etcd-ip-10-0-23-236.ap-south-1.compute.internal -c etcdctl -- \
+  etcdctl endpoint status --cluster -w table
 ```
 
-**Expected output** *(requires a cluster + admin — representative):*
+**Verified output** *(live, `oc 4.22.0` against OCP 4.18.45, etcd 3.5.18):*
 
 ```
-+--------------------------+------------------+---------+---------+-----------+------------+
-|         ENDPOINT         |        ID        | VERSION | DB SIZE | IS LEADER | RAFT TERM  |
-+--------------------------+------------------+---------+---------+-----------+------------+
-| https://10.0.0.10:2379   | 8e9e05c52164694d | 3.5.x   | 148 MB  |   true    |     12     |
-| https://10.0.0.11:2379   | 91bc3c398fb3c146 | 3.5.x   | 148 MB  |   false   |     12     |
-| https://10.0.0.12:2379   | fd422379fda50e48 | 3.5.x   | 149 MB  |   false   |     12     |
-+--------------------------+------------------+---------+---------+-----------+------------+
-exit                                     # leave the etcd pod
++--------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+|         ENDPOINT         |        ID        | VERSION | DB SIZE | IS LEADER | IS LEARNER | RAFT TERM | RAFT INDEX | RAFT APPLIED INDEX | ERRORS |
++--------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+| https://10.0.93.108:2379 | 1b81f2b54b789f68 |  3.5.18 |  154 MB |     false |      false |        27 |    1285785 |            1285785 |        |
+| https://10.0.23.236:2379 | 20cca90be2311bc6 |  3.5.18 |  154 MB |      true |      false |        27 |    1285786 |            1285786 |        |
+| https://10.0.61.153:2379 | 4b1c94fe18d9a668 |  3.5.18 |  154 MB |     false |      false |        27 |    1285786 |            1285786 |        |
++--------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
 ```
 
 > **Narrate:** Exactly **one leader** (`IS LEADER true`) — the member that serializes all
 > writes; the others are followers. All share the same **RAFT TERM** (no recent election
-> churn) and a similar **DB SIZE** (in sync). A leader flapping term-to-term is a red flag.
+> churn) and near-identical **DB SIZE** (in sync). A leader flapping term-to-term is a red flag.
+> Current etcd 3.5.x also reports **IS LEARNER** (a member still catching up, not yet a full
+> voting member — relevant during member replacement) and the raft **INDEX**/**APPLIED INDEX**
+> pair (equal here, meaning nothing is lagging behind the write log).
 
 ---
 
@@ -121,19 +137,41 @@ increase(etcd_server_leader_changes_seen_total[1h])
 etcd_mvcc_db_total_size_in_bytes
 ```
 
-**Expected result** *(requires a cluster — representative):*
+Run live via the `thanos-querier` route (the same backend the console's Observe → Metrics
+uses) rather than pasting into the console, so the output below is scriptable:
+
+```bash
+TOKEN=$(oc whoami -t)
+HOST=$(oc -n openshift-monitoring get route thanos-querier -o jsonpath='{.spec.host}')
+curl -sk -H "Authorization: Bearer $TOKEN" \
+  --data-urlencode 'query=histogram_quantile(0.99,rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m]))' \
+  "https://$HOST/api/v1/query"
+```
+
+**Verified result** *(live, queried via `thanos-querier` route against OCP 4.18.45; trimmed to
+the `instance`/`value` fields):*
 
 ```
-{instance="10.0.0.10:2379"}   0.0043     # ~4.3ms p99 fsync — healthy (< ~10ms)
-{instance="10.0.0.11:2379"}   0.0051
-increase(...leader_changes...) 0          # no elections in the last hour
-etcd_mvcc_db_total_size_in_bytes 1.55e8   # ~148 MB, well under quota
+{instance="10.0.23.236:9979"}   0.004935   # ~4.9ms p99 fsync — healthy (< ~10ms)
+{instance="10.0.61.153:9979"}   0.006058   # ~6.1ms
+{instance="10.0.93.108:9979"}   0.004581   # ~4.6ms
+
+increase(etcd_server_leader_changes_seen_total[1h])   0   # all 3 instances, no elections
+
+etcd_mvcc_db_total_size_in_bytes:
+  10.0.23.236:9979   155643904   # ~148 MiB
+  10.0.61.153:9979   154001408   # ~147 MiB
+  10.0.93.108:9979   155623424   # ~148 MiB, well under the 8 GiB default quota
 ```
 
 > **Narrate:** `etcd_disk_wal_fsync_duration_seconds` p99 under ~**10 ms** is the green zone —
 > etcd commits nothing until fsync returns, so **disk latency *is* etcd latency**. Zero leader
 > changes = a stable leader. OpenShift ships **`etcdHighFsyncDurations`** and
 > **`etcdMembersDown`** alerts on exactly these, so you're paged before it's fatal.
+>
+> Note the `instance` label here is `<node-ip>:9979` — the **etcd-metrics** sidecar's port,
+> not the client port `2379` used in Steps 2–3. Same three members, different label because
+> it's a different scrape target (metrics vs. client API).
 
 ---
 
@@ -145,11 +183,11 @@ etcd_mvcc_db_total_size_in_bytes 1.55e8   # ~148 MB, well under quota
 oc get clusteroperator etcd
 ```
 
-**Expected output** *(requires a cluster — representative):*
+**Verified output** *(live, `oc 4.22.0` against OCP 4.18.45):*
 
 ```
 NAME   VERSION   AVAILABLE   PROGRESSING   DEGRADED   SINCE
-etcd   4.18.x    True        False         False      21d
+etcd   4.18.45   True        False         False      11d
 ```
 
 > **Narrate:** `AVAILABLE=True, DEGRADED=False` from the **etcd cluster operator** is the
@@ -178,9 +216,9 @@ echo "read-only demo — no cleanup needed"
 
 ---
 
-> **◐ Partially verified:** `etcdctl`/`oc`/PromQL **syntax** follows the etcd 3.5 / oc 4.22
-> reference, but every step **requires a live OpenShift cluster with cluster-admin** (the
-> `openshift-etcd` namespace and etcd client certs are admin-only) and was not run at
-> authoring (cluster asleep/unreachable). Output — endpoint tables, member IDs, latencies,
-> DB sizes — is **representative of OpenShift 4.18 / etcd 3.5**; real values vary per cluster.
-> Validate live as admin when the cluster is up. **Backup/restore is Module 12.**
+> **✅ Verified:** `oc 4.22.0` · OCP `4.18.45` / etcd `3.5.18` · cluster `mobily-ocp-training`
+> · every command in Steps 1–5 was **run live as `kube:admin`** and the output above is real
+> (endpoint tables, member IDs, latencies, DB sizes, PromQL results — nothing fabricated).
+> Pod names, IPs, member IDs, latencies, and DB size are **this cluster's specific values** —
+> expect the same shape (3 members, one leader, sub-10ms fsync) but different literal numbers
+> on a different cluster. **Backup/restore is Module 12.**

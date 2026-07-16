@@ -46,9 +46,23 @@
 # 3. logs (Observe → Logs):
 #   { kubernetes_namespace_name="mobily-apps", kubernetes_container_name="subscriber-api" } |= "ERROR"
 #   { kubernetes_namespace_name="mobily-apps", kubernetes_container_name="subscriber-db" }
-# 4. etcd (admin):
+# 4. etcd (admin) — pod names are cluster-specific, so look one up first rather than
+#    assuming "etcd-master-0":
 oc get clusteroperator etcd
-oc -n openshift-etcd rsh etcd-master-0 etcdctl endpoint health --cluster
+oc -n openshift-etcd get pods -l app=etcd -o name | head -1 | \
+  xargs -I{} oc -n openshift-etcd exec {} -c etcdctl -- etcdctl endpoint health --cluster
+```
+
+**Verified etcd output** *(live, `oc 4.22.0` against OCP 4.18.45 — Task 4 only; Tasks 1–3 need
+a real firing incident, see the footer):*
+
+```
+NAME   VERSION   AVAILABLE   PROGRESSING   DEGRADED   SINCE
+etcd   4.18.45   True        False         False      11d
+
+https://10.0.23.236:2379 is healthy: successfully committed proposal: took = 12.819044ms
+https://10.0.93.108:2379 is healthy: successfully committed proposal: took = 19.628641ms
+https://10.0.61.153:2379 is healthy: successfully committed proposal: took = 19.683843ms
 ```
 
 Expected: 5xx ratio well above 0.05; `subscriber-api` logs show `connection refused:
@@ -88,9 +102,10 @@ subscriber-db`; `subscriber-db` logs show `OOMKilled`; etcd all healthy → **no
 oc get pods -n mobily-apps -l app=subscriber-db      # RESTARTS climbing, last state OOMKilled
 oc describe pod -n mobily-apps -l app=subscriber-db | grep -A3 'Last State'
 
-# 4. Rule out etcd (admin):
+# 4. Rule out etcd (admin) — look up a real pod name, don't assume "etcd-master-0":
 oc get clusteroperator etcd                          # AVAILABLE=True DEGRADED=False
-oc -n openshift-etcd rsh etcd-master-0 etcdctl endpoint health --cluster   # all healthy
+oc -n openshift-etcd get pods -l app=etcd -o name | head -1 | \
+  xargs -I{} oc -n openshift-etcd exec {} -c etcdctl -- etcdctl endpoint health --cluster
 #    (and Observe → Metrics: etcd p99 fsync < ~10ms, 0 leader changes)
 
 # 5. Fix: raise subscriber-db's memory limit (or fix the leak); the DB stops
@@ -98,15 +113,20 @@ oc -n openshift-etcd rsh etcd-master-0 etcdctl endpoint health --cluster   # all
 oc set resources deploy/subscriber-db -n mobily-apps --limits=memory=512Mi
 ```
 
-**Representative output** *(requires a cluster — OCP 4.18):*
+**Output** *(the metrics/log lines are representative — they need the simulated incident from
+Tasks 1–3; the etcd lines are real, live output against `mobily-ocp-training`, OCP 4.18.45):*
 
 ```
-# metrics: 0.12
-# subscriber-api log:  500 connection refused: subscriber-db:5432
-# subscriber-db log:   FATAL: out of memory — OOMKilled, restarting
-etcd   4.18.x   True   False   False   21d
-+------------------------+--------+---------+-------+
-| ...:2379               |  true  | 4.8ms   |       |   (x3, all healthy)
+# metrics: 0.12                                                       [representative]
+# subscriber-api log:  500 connection refused: subscriber-db:5432     [representative]
+# subscriber-db log:   FATAL: out of memory — OOMKilled, restarting   [representative]
+
+etcd   4.18.45   True        False         False      11d            [✅ verified live]
+
+https://10.0.23.236:2379 is healthy: successfully committed proposal: took = 12.819044ms
+https://10.0.93.108:2379 is healthy: successfully committed proposal: took = 19.628641ms
+https://10.0.61.153:2379 is healthy: successfully committed proposal: took = 19.683843ms
+                                                                       [✅ verified live]
 ```
 
 **Incident note (Task 5):**
@@ -123,8 +143,13 @@ health tells you whether the brain is the problem.
 
 ---
 
-> **◐ Partially verified:** PromQL/LogQL/`etcdctl`/`oc` **syntax** follows the OCP 4.18 / oc
-> 4.22 references; every step **requires a live cluster** (Task 4 needs cluster-admin) and was
-> not run at authoring (cluster asleep/unreachable). Output — ratios, log lines, etcd tables —
-> is **representative of OpenShift 4.18**; real values vary per cluster. Validate live when the
-> cluster is up (alerts/metrics/logs as a project user; etcd inspection as admin).
+> **◐ Partially verified:** re-checked live against `mobily-ocp-training` (OCP 4.18.45,
+> `oc 4.22.0`, as `kube:admin`). **Task 4 (rule out etcd) is fully verified** — the
+> `clusteroperator etcd` and `etcdctl endpoint health` output above are real, and the
+> original `etcd-master-0` pod name was a bug (that literal pod doesn't exist on IPI/AWS
+> clusters — real names are the node's instance hostname); the fixed command looks the real
+> name up first instead of hardcoding it. Tasks 1–3 (the firing alert, the metrics ratio, the
+> `subscriber-api` → `subscriber-db` log trail) stay **representative by design** — this
+> capstone's whole point is diagnosing a *real* incident you or your instructor triggers
+> (e.g. by starving `subscriber-db`'s memory limit), so those outputs can't be pre-verified
+> without faking the incident itself.

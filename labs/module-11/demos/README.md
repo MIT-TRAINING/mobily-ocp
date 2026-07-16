@@ -47,9 +47,21 @@ Companion material: the interactive [visualizations](../index.html), the hands-o
 
 ---
 
-> **◐ Partially verified (see each demo's footer).** Manifest-rendering steps
-> (`oc create --dry-run=client -o yaml` for **PrometheusRule** and **ServiceMonitor**) were
-> **run live offline with oc 4.22** — real output. Steps needing a **live cluster** (Observe
-> dashboards, LogQL results, `etcdctl` output) are **representative of OpenShift 4.18** and
-> should be validated when the cluster is up (dashboards/logs as a project user; UWM/Logging
-> install and etcd `rsh` as admin).
+> **Verification status (see each demo's footer for detail).** Re-validated against the live
+> `mobily-ocp-training` cluster (OCP 4.18.45, `oc 4.22.0`, as `kube:admin`):
+>
+> - **Demo 3 (etcd) — ✅ fully verified live.** Every step (pod listing, `etcdctl endpoint
+>   health/status` via `oc exec`, PromQL via the `thanos-querier` route, `clusteroperator
+>   etcd`) was run for real; all output in the file is genuine.
+> - **Demo 1 (monitoring) — ◐ partially verified.** Steps 1–2 (Observe pod list, enabling
+>   user workload monitoring) were run live — UWM is now durably enabled on this cluster, and
+>   a stale field name (`enableUserWorkloadMonitoring` → correct is `enableUserWorkload`) was
+>   caught and fixed in the process. Steps 3–4 (ServiceMonitor/PrometheusRule renders) were
+>   verified offline via `--dry-run=client`. Step 5 (watching the alert fire) is
+>   representative **by design** — it needs a real app under real 5xx load for the full
+>   `for: 10m` window, which is Exercise 1's job.
+> - **Demo 2 (logging) — ◐ syntax-checked, not live.** The Logging + Loki Operators are
+>   confirmed **not installed** on this cluster (live check, not just "cluster unreachable").
+>   LogQL/`ClusterLogForwarder` syntax was checked against the Logging 6.2 API source rather
+>   than run, since installing the stack needs backing object storage and is a real,
+>   costed, cluster-admin prerequisite — **install before delivering this demo.**

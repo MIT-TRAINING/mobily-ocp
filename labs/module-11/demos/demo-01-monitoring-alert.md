@@ -39,14 +39,15 @@
 oc -n openshift-monitoring get pods | grep -E 'prometheus-k8s|alertmanager-main|thanos-querier'
 ```
 
-**Expected output** *(requires a cluster — representative of OCP 4.18):*
+**Verified output** *(live, `oc 4.22.0` against OCP 4.18.45):*
 
 ```
-alertmanager-main-0                            6/6     Running
-alertmanager-main-1                            6/6     Running
-prometheus-k8s-0                               6/6     Running
-prometheus-k8s-1                               6/6     Running
-thanos-querier-7d9c...-abcde                   6/6     Running
+alertmanager-main-0                                      6/6     Running   6          11h
+alertmanager-main-1                                      6/6     Running   6          11h
+prometheus-k8s-0                                         6/6     Running   6          11h
+prometheus-k8s-1                                         6/6     Running   6          11h
+thanos-querier-754c6cfddd-6jxs5                          6/6     Running   6          11h
+thanos-querier-754c6cfddd-7lvbz                          6/6     Running   6          11h
 ```
 
 > **Narrate:** In the console, **Observe → Metrics** runs ad-hoc PromQL; try
@@ -69,24 +70,34 @@ metadata:
   namespace: openshift-monitoring
 data:
   config.yaml: |
-    enableUserWorkloadMonitoring: true
+    enableUserWorkload: true
 EOF
 oc -n openshift-user-workload-monitoring get pods
 ```
 
-**Expected output** *(requires a cluster + admin — representative):*
+**Verified output** *(live, `oc 4.22.0` against OCP 4.18.45, ~1 minute after apply):*
 
 ```
 configmap/cluster-monitoring-config created
-NAME                                   READY   STATUS
-prometheus-user-workload-0             6/6     Running
-prometheus-user-workload-1             6/6     Running
-prometheus-operator-...                2/2     Running
+NAME                                   READY   STATUS    RESTARTS   AGE
+prometheus-operator-655cbbf5d9-vc8hr   2/2     Running   0          56s
+prometheus-user-workload-0             6/6     Running   0          53s
+prometheus-user-workload-1             6/6     Running   0          53s
+thanos-ruler-user-workload-0           4/4     Running   0          53s
+thanos-ruler-user-workload-1           4/4     Running   0          53s
 ```
 
-> **Narrate:** Flipping one flag spins up a **second Prometheus** in
-> `openshift-user-workload-monitoring` dedicated to *your* apps — kept isolated from the
-> platform one so your queries and alerts can't destabilise cluster monitoring.
+> **Narrate:** Flipping one flag spins up a **second Prometheus** (plus a **Thanos Ruler**, for
+> alerting rules over long-term/aggregated data) in `openshift-user-workload-monitoring`
+> dedicated to *your* apps — kept isolated from the platform one so your queries and alerts
+> can't destabilise cluster monitoring. Pods take under a minute to come up from a cold start.
+>
+> **Field-name correction:** the config key is **`enableUserWorkload`**, not
+> `enableUserWorkloadMonitoring` — an older/community name that some blog posts still use.
+> Applying it with the wrong key is rejected outright by the cluster's validating admission
+> webhook (`admission webhook "monitoringconfigmaps.openshift.io" denied the request: ...
+> unknown field "enableUserWorkloadMonitoring"`), so the typo fails loudly rather than
+> silently doing nothing — but it's worth getting right the first time in front of a class.
 
 ---
 
@@ -198,7 +209,7 @@ oc -n mobily-monitoring get prometheusrule subscriber-api-alerts
 # Observe → Alerting shows: Inactive → Pending (during 'for') → Firing
 ```
 
-**Expected output** *(requires a cluster — representative):*
+**Expected output** *(deliberately not run in this pass — see note below):*
 
 ```
 prometheusrule.monitoring.coreos.com/subscriber-api-alerts created
@@ -211,6 +222,14 @@ subscriber-api-alerts      12s
 > elapses, then flips to **Firing** and reaches **Alertmanager**, which groups it and routes
 > `severity=warning` to its configured receiver (e.g. Slack). A critical-severity alert would
 > go to PagerDuty instead — same alert engine, different route.
+>
+> **Scope note:** this step assumes `subscriber-api` is already deployed and emitting
+> `http_requests_total` in the `mobily-apps`/`mobily-monitoring` namespaces (neither exists
+> yet on a fresh cluster — this demo doesn't create them). Watching the alert really move
+> Pending → Firing needs the app deployed, real 5xx traffic, and waiting out the `for: 10m`
+> window — that full loop is **Exercise 1**, not this demo. Steps 1–4 here establish the
+> *mechanism* (stack is up, UWM is live, the objects render correctly); Exercise 1 is where
+> it fires for real.
 
 ---
 
@@ -222,7 +241,8 @@ oc delete servicemonitor subscriber-api -n mobily-apps
 # (leave user workload monitoring enabled — it's cluster config, not per-demo)
 ```
 
-**Expected output** *(representative):*
+**Expected output** *(representative — cleans up the objects Steps 3–5 describe applying for
+real; this validation pass only rendered them offline, so there was nothing to delete):*
 
 ```
 prometheusrule.monitoring.coreos.com "subscriber-api-alerts" deleted
@@ -240,9 +260,12 @@ servicemonitor.monitoring.coreos.com "subscriber-api" deleted
 
 ---
 
-> **◐ Partially verified — Steps 3 & 4 VERIFIED offline; cluster steps representative.**
-> The **ServiceMonitor** and **PrometheusRule** renders (`oc create --dry-run=client -o yaml`,
-> Steps 3–4) were **run live offline with oc 4.22** — real output. Steps needing a **live
-> cluster** (pod listings, UWM pods, Observe → Alerting state) are **representative of
-> OpenShift 4.18**; enabling UWM is admin, the ServiceMonitor/PrometheusRule are project-user
-> actions. Validate when the cluster is up.
+> **◐ Partially verified:** Steps 1–2 were **run live** (`oc 4.22.0` against OCP 4.18.45,
+> cluster `mobily-ocp-training`, as `kube:admin`) — the platform pod list and the UWM enable
+> (with the corrected `enableUserWorkload` field) are real output, and UWM is now durably
+> enabled on this shared cluster. Steps 3–4 (**ServiceMonitor**/**PrometheusRule** renders,
+> `oc create --dry-run=client -o yaml`) were **run live offline** — also real output. Step 5
+> (the alert actually firing) is **representative by design**, not a verification gap: it
+> requires the `subscriber-api` app deployed and generating real 5xx traffic for the full
+> `for: 10m` window, which is **Exercise 1**'s job, not this demo's. Step 6 is representative
+> for the same reason (nothing was created for real in this pass to clean up).

@@ -60,8 +60,17 @@ Companion material: the guided [demos](../demos/README.md), the interactive
 
 ---
 
-> **◐ Partially verified (cluster asleep/unreachable at authoring).** Manifest renders
-> (`oc create --dry-run=client -o yaml`) were run **live offline** (real). Steps needing a
-> **live cluster** (alert firing, LogQL results, etcd tables) are **representative of
-> OpenShift 4.18** and can be validated when the cluster is up (ServiceMonitor/PrometheusRule
-> and log queries as a project user; UWM/Logging install and etcd inspection as admin).
+> **Verification status (see each exercise's footer for detail).** Re-checked against the
+> live `mobily-ocp-training` cluster (OCP 4.18.45, `oc 4.22.0`, as `kube:admin`):
+>
+> - **Exercise 1 (alert) — ◐ partially verified.** UWM is confirmed live (already enabled,
+>   `prometheus-user-workload-*` pods up 8h+); the ServiceMonitor/PrometheusRule dry-run
+>   renders are real. Applying the CRs for real and watching `up`/the alert fire needs *your*
+>   `subscriber-api` deployed — that's the task, left for the participant.
+> - **Exercise 2 (logs) — ◐ syntax-checked, not live.** Logging + Loki are confirmed **not
+>   installed** on this cluster (live check). LogQL/CLF syntax checked against the Logging 6.2
+>   API source — install the Operators before assigning this exercise.
+> - **Exercise 3 (capstone) — ◐ partially verified.** Task 4 (rule out etcd) is **fully
+>   verified live** — also fixed a bug where the original `etcd-master-0` pod name doesn't
+>   exist on real clusters (names are node-hostname-derived; look the pod up, don't hardcode
+>   it). Tasks 1–3 need a real triggered incident and stay representative by design.

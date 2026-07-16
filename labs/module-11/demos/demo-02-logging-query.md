@@ -21,6 +21,16 @@
 > ⚠️ **Installing the Logging + Loki Operators and the LokiStack is cluster-admin.** Querying
 > logs for namespaces you can read is a project-user action (RBAC-scoped in Observe → Logs).
 
+> 🔧 **Prerequisite — not yet installed on this training cluster.** Checked live
+> (`oc get csv -A | grep -Ei 'cluster-logging|loki'` → no results): `cluster-logging` and
+> `loki-operator` are available in the catalog (`oc get packagemanifest -A` shows both under
+> **Red Hat Operators**) but **no CSV is installed**, so `openshift-logging`/LokiStack don't
+> exist yet here. Standing up the full stack (Operators + a LokiStack, which needs backing
+> object storage — typically an S3 bucket) is real infra work with a real cost, so it's a
+> **before-class setup task for the instructor**, not something this demo does live. Steps
+> below show the intended flow with output representative of a correctly installed stack;
+> the LogQL/CLF syntax has been checked against the current Logging 6.x API and is accurate.
+
 ## Talking points to open with
 
 - **Metrics say *that* it broke; logs say *why*.** This is the "why" tool.
@@ -38,7 +48,16 @@ oc -n openshift-logging get lokistack                  # the log store
 oc -n openshift-logging get pods | grep -E 'vector|loki'
 ```
 
-**Expected output** *(requires a cluster + Logging Operators — representative of OCP 4.18):*
+On **this** training cluster today, the first command comes back empty — real, live output:
+
+```
+$ oc get csv -A | grep -Ei 'cluster-logging|loki'
+$                                              # no output: Operators not installed yet
+```
+
+**Expected output once the Operators + LokiStack are installed** *(representative of OCP
+4.18 / Logging 6.x — the shape to expect after the instructor completes the prerequisite
+install):*
 
 ```
 cluster-logging.v6.x.y     Red Hat OpenShift Logging   6.x.y   Succeeded
@@ -168,15 +187,23 @@ echo "read-only demo — no cleanup needed"
 ## Wrap-up questions to pose
 
 1. Why reach for logs here instead of a metric/alert?
-2. In `{namespace="self-care"} |= "ERROR"`, which part uses Loki's index and which greps text?
+2. In `{kubernetes_namespace_name="self-care"} |= "ERROR"`, which part uses Loki's index and
+   which greps text?
 3. What are the three log types, and why keep them as separate streams?
 4. When is `oc logs` the right tool, and when does it let you down?
 
 ---
 
-> **◐ Partially verified:** LogQL/`oc logs` **syntax** follows the Logging 6.x / oc 4.22
-> reference, but every step **requires a live cluster with the Logging + Loki Operators** and
-> was not run at authoring (cluster asleep/unreachable). Output is **representative of
-> OpenShift 4.18**; label names (`kubernetes_namespace_name`, `kubernetes_container_name`) and
-> the `observability.openshift.io/v1` API match Logging 6.x — validate when the cluster is up
-> (Operator/LokiStack install as admin; log queries as a project user).
+> **◐ Partially verified:** the cluster is live and reachable (`oc 4.22.0` against OCP
+> 4.18.45, `kube:admin`), and **Step 1's "no Operators installed" state was confirmed live**
+> (`oc get csv -A` for `cluster-logging`/`loki-operator` returns nothing; both are
+> catalog-available per `oc get packagemanifest -A`, just not installed on this cluster).
+> Everything downstream of that — LogQL selector/filter syntax (`|= != |~`,
+> `kubernetes_namespace_name`, `kubernetes_container_name`), the `ClusterLogForwarder`
+> `observability.openshift.io/v1` schema (`inputRefs: [application, infrastructure, audit]`,
+> `type: lokiStack` with a `target: {name, namespace}`) — was **checked against the Logging
+> 6.2 API source** (`openshift/cluster-logging-operator`, `release-6.2` branch), not run live,
+> since installing the stack (Operators + a LokiStack needing backing object storage) is a
+> real, costed, cluster-admin prerequisite outside this validation pass. Output blocks are
+> representative of a correctly installed stack. **Install the Operators + LokiStack before
+> delivering this demo**; log queries themselves are a project-user action once that's done.
