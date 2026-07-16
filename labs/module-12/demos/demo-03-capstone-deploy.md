@@ -41,7 +41,8 @@ oc create secret generic subscriber-db-creds \
   -n mobily-capstone --dry-run=client -o yaml
 ```
 
-**Verified render** *(`oc create --dry-run=client -o yaml`, run offline with oc 4.22 — real):*
+**Live-verified render** *(`oc create --dry-run=client -o yaml`, run live against the OCP 4.18.45
+training cluster with oc 4.22 — real, and also applied for real and deleted afterward):*
 
 ```yaml
 apiVersion: v1
@@ -77,7 +78,8 @@ spec:
 EOF
 ```
 
-**Verified render** *(`oc create --dry-run=client -o yaml`, run offline with oc 4.22 — real):*
+**Live-verified render** *(`oc create --dry-run=client -o yaml`, run live with oc 4.22 — real; also
+applied for real against the training cluster):*
 
 ```yaml
 apiVersion: v1
@@ -97,6 +99,12 @@ spec:
 > **PVC** binds to a **PV** via the default StorageClass; the bytes live outside the pod. Recall
 > from §2 of the guide: the **etcd backup** would restore *this PVC object* but **not** the data
 > inside its PV — that needs its own snapshot/OADP.
+>
+> **Live gotcha:** applying this for real on the training cluster left the PVC in **`Pending`**,
+> not `Bound` — the default StorageClass here is `gp3-csi` (AWS EBS CSI), which uses
+> **`WaitForFirstConsumer`** binding mode. The PVC only binds once a pod that mounts it is actually
+> scheduled (Step 3's `subscriber-db` Deployment). `oc get pvc` showing `Pending` right after
+> creation is expected here, not a fault.
 
 ---
 
@@ -109,7 +117,7 @@ oc create deployment subscriber-db \
   -n mobily-capstone --dry-run=client -o yaml
 ```
 
-**Verified render** *(`oc create --dry-run=client -o yaml`, run offline with oc 4.22 — real, trimmed):*
+**Live-verified render** *(`oc create --dry-run=client -o yaml`, run live with oc 4.22 — real, trimmed):*
 
 ```yaml
 apiVersion: apps/v1
@@ -149,12 +157,15 @@ oc create route edge self-care --service=self-care --port=8080 \
   -n mobily-capstone --dry-run=client -o yaml
 ```
 
-**Verified render** *(`oc create route edge --dry-run=client -o yaml`, run offline with oc 4.22 — real):*
+**Live-verified render** *(`oc create route edge --dry-run=client -o yaml`, run live against the
+training cluster with oc 4.22 — real; the Service was also created for real first):*
 
 ```yaml
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
+  labels:
+    app: self-care
   name: self-care
   namespace: mobily-capstone
 spec:
@@ -173,6 +184,12 @@ status: {}
 > terminated at the router) exposes only the `self-care` portal to customers. Key gotcha: a Route
 > with **no ready endpoints** behind its Service → **503**. `oc get endpoints self-care` must be
 > non-empty. Only the portal is exposed — api and db stay internal.
+>
+> **Live finding:** the render **only** includes `metadata.labels: {app: self-care}` when the target
+> **Service already exists** at render time (confirmed by running the same `--dry-run=client`
+> command against a nonexistent service name — the labels block disappears). `oc create route`
+> copies the target Service's labels onto the Route. If you render the Route *before* running
+> `oc expose`, you won't see this label — order matters even for a dry-run.
 
 ---
 
@@ -219,10 +236,16 @@ oc delete project mobily-capstone
 
 ---
 
-> **◐ Partially verified:** the capstone **manifests render for real** — the **Secret**, **PVC**,
-> **Deployment**, and **Route** YAML above were produced by `oc create --dry-run=client -o yaml`
-> **run live offline with oc 4.22** (real output). Steps needing a **live cluster** (actual pod
-> readiness, endpoints, Argo CD `Synced/Healthy`) are **representative of OpenShift 4.18** — the
-> stack objects apply as a project user; the **Argo CD Operator** install is admin (Module 10).
-> Validate live when the cluster is up. Image `quay.io/sclorg/postgresql-15-c9s` is the freely
-> pullable PostgreSQL used across this course.
+> **● Live-verified — 2026-07-15**, project-user, on the shared **OCP 4.18.45** training cluster.
+> The **Secret**, **PVC**, **Deployment**, and **Route** manifests above were both rendered
+> (`--dry-run=client -o yaml`) **and actually applied** in a real `mobily-capstone` project — the
+> Secret and PVC were created live, the PVC's real (if initially `Pending`, see inline gotcha)
+> binding behavior was observed, and the Route was rendered against a real pre-existing Service.
+> Two real discrepancies were found and corrected against this cluster/oc version (see inline
+> notes): the PVC's `WaitForFirstConsumer` binding, and the Route inheriting the Service's labels.
+> The scratch project was deleted after. Steps needing **application-level health** (real
+> `self-care`/`subscriber-api` business logic, actual endpoint readiness, Argo CD
+> `Synced`/`Healthy`) are still **representative** — this capstone is meant to be built out with
+> real application images and a real Argo CD Application per Module 10, which wasn't re-run here.
+> The **Argo CD Operator** install is admin (Module 10). Image
+> `quay.io/sclorg/postgresql-15-c9s` is the freely pullable PostgreSQL used across this course.

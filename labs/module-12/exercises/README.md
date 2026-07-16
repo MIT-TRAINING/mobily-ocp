@@ -35,7 +35,7 @@ oc login https://api.<cluster-domain>:6443 -u <user> -p "$OCP_PASSWORD"   # or t
 oc whoami
 oc get clusteroperators etcd                          # etcd healthy before you snapshot it?
 oc get nodes                                          # nodes Ready?
-oc get csv -n openshift-gitops 2>/dev/null | grep -i argocd   # Argo CD present (for Ex 3 GitOps)?
+oc get csv -n openshift-gitops 2>/dev/null | grep -i gitops   # Argo CD present (for Ex 3 GitOps)?
 oc new-project mobily-capstone 2>/dev/null || oc project mobily-capstone
 ```
 
@@ -43,8 +43,10 @@ oc new-project mobily-capstone 2>/dev/null || oc project mobily-capstone
   `self-care`; a bare `GET /` → **403** proves connectivity. Database:
   **`quay.io/sclorg/postgresql-15-c9s`** (freely pullable; `POSTGRESQL_USER`/`_PASSWORD`/
   `_DATABASE` env). Instrument a real app for true `/metrics`.
-- Replace placeholders (`<cluster-domain>`, `<master-0>`, `<your-password>`). **Never commit real
-  tokens/passwords** — use `$OCP_PASSWORD` or a token file you supply.
+- Replace placeholders (`<cluster-domain>`, `<your-password>`). **Never commit real
+  tokens/passwords** — use `$OCP_PASSWORD` or a token file you supply. For a master node, capture
+  the real name instead of guessing — real cluster hostnames aren't `master-0/1/2`:
+  `MASTER=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[0].metadata.name}')`.
 - **Cluster-admin needed for:** `cluster-backup.sh`/`cluster-restore.sh`, `oc debug node`,
   `oc adm cordon/drain`, `oc delete node`, reading etcd/ClusterOperators, and `oc adm must-gather`.
   The capstone objects in your namespace and reading your own pods/logs are project-user actions.
@@ -62,9 +64,17 @@ Companion material: the guided [demos](../demos/README.md), the interactive
 
 ---
 
-> **◐ Partially verified (cluster asleep/unreachable at authoring).** Capstone manifest renders
-> (`oc create --dry-run=client -o yaml` for Secret/PVC/Route/Deployment) and diagnostic help text
-> (`oc debug -h`, `oc adm must-gather -h`) were run **live offline with oc 4.22** (real). Steps
-> needing a **live cluster** (backup-script output, broken-pod events, node drain, Argo CD sync)
-> are **representative of OpenShift 4.18** and can be validated when the cluster is up (backup/
-> restore, node ops, etcd, `must-gather` as admin; the capstone objects as a project user).
+> **● Live-verified — 2026-07-16 (see each exercise's footer).** All three exercises were re-run
+> against the shared **OCP 4.18.45** training cluster while it was up: Exercise 1's
+> `cluster-backup.sh` snapshot, off-cluster copy, and cleanup all ran for real on a live master;
+> Exercise 2's crash-loop/OOMKilled scenario was reproduced with real broken pods; Exercise 3's full
+> stack (Secret/PVC/Deployments/Services/Route) was applied for real in a scratch project. Three
+> real bugs were found and fixed in the process: this page's own pre-flight check
+> (`grep -i argocd`, which never matches — the GitOps operator's CSV says "GitOps," not "argocd";
+> now `grep -i gitops`), a stale `<master-0>` placeholder (real cluster node names are AWS-derived
+> hostnames — replaced with a captured `$MASTER` variable), and Exercise 3's `awk` filter mismatch
+> plus its Secret key names (`username`/`password` don't match what `oc set env --from=secret`
+> produces or what the postgres image requires — must be `POSTGRESQL_USER`/`POSTGRESQL_PASSWORD`).
+> All scratch namespaces created for validation were deleted afterward. Exercise 1's `restore` and
+> Exercise 2's degraded-ClusterOperator example remain narrated/representative, since triggering
+> those safely requires deliberately breaking a shared training cluster.

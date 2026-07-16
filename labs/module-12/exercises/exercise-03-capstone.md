@@ -23,6 +23,17 @@
 1. **Project + Secret + PVC.** Create `mobily-capstone`, a `Secret` `subscriber-db-creds`
    (username/password), and a 2Gi `PVC` `subscriber-db-data`. **Render each offline**
    (`--dry-run=client -o yaml`) before applying.
+
+   > **Gotcha (found live):** if you plan to wire this Secret into `subscriber-db` with
+   > `oc set env --from=secret/...` (Task 2), name its keys **`POSTGRESQL_USER`** /
+   > **`POSTGRESQL_PASSWORD`** exactly — not `username`/`password`. `oc set env --from=secret`
+   > **uppercases** the secret's key name to form the env var name (a key named `username` becomes
+   > env var `USERNAME`, confirmed live), so a secret keyed `username`/`password` produces env vars
+   > `USERNAME`/`PASSWORD` — neither of which the sclorg postgres image recognizes. It requires the
+   > env vars named exactly `POSTGRESQL_USER`/`POSTGRESQL_PASSWORD`/`POSTGRESQL_DATABASE`, so the
+   > Secret's keys need to already be spelled that way. Get this wrong and the container never
+   > starts (`CreateContainerConfigError`, or a "you must specify POSTGRESQL_USER..." log).
+   > Confirmed by actually running it — see the exercise footer.
 2. **Three tiers.** Deploy `subscriber-db` (`quay.io/sclorg/postgresql-15-c9s`, mounting the Secret
    as env + the PVC for data), `subscriber-api`, and `self-care` (both `ubi9/httpd-24` stand-ins).
 3. **Wire + expose.** A `Service` per tier; an **edge-TLS `Route`** on `self-care` only. Confirm the
@@ -88,8 +99,11 @@ Expected: every manifest renders offline; the Route has non-empty endpoints and 
 oc new-project mobily-capstone
 
 # 1. Secret + PVC (render offline first)
+# NOTE: keys are named to match what postgres needs directly (POSTGRESQL_USER/PASSWORD) —
+# oc set env --from=secret uppercases the key name to make the env var name, so `username`/
+# `password` would become USERNAME/PASSWORD, which the image doesn't recognize (verified live).
 oc create secret generic subscriber-db-creds \
-  --from-literal=username=mobily --from-literal=password='<your-password>' \
+  --from-literal=POSTGRESQL_USER=mobily --from-literal=POSTGRESQL_PASSWORD='<your-password>' \
   -n mobily-capstone --dry-run=client -o yaml | tee secret.yaml
 oc create -f - --dry-run=client -o yaml <<'EOF' | tee pvc.yaml
 apiVersion: v1
@@ -98,6 +112,8 @@ metadata: { name: subscriber-db-data, namespace: mobily-capstone }
 spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 2Gi } } }
 EOF
 oc apply -f secret.yaml -f pvc.yaml
+# the PVC stays Pending until Task 2's pod mounts it — this cluster's default StorageClass
+# (gp3-csi) uses WaitForFirstConsumer binding (verified live); that's expected, not a fault.
 
 # 2. three tiers (skeletons; add envFrom Secret + volumeMount PVC to the db)
 oc create deployment subscriber-db  --image=quay.io/sclorg/postgresql-15-c9s:latest -n mobily-capstone
@@ -113,7 +129,12 @@ oc expose deployment self-care      --port=8080 -n mobily-capstone
 oc expose deployment subscriber-api --port=8080 -n mobily-capstone
 oc expose deployment subscriber-db  --port=5432 -n mobily-capstone
 oc create route edge self-care --service=self-care --port=8080 -n mobily-capstone | tee route.yaml
+# rendering AFTER the self-care Service exists means the Route inherits the Service's
+# labels (verified live: metadata.labels: {app: self-care} appears on the created Route) —
+# render it before `oc expose` and that label is absent.
 oc -n mobily-capstone get endpoints self-care        # non-empty = Service has ready pods
+# verified live: right after `oc create route`, endpoints show <none> until the self-care
+# pod actually reaches Ready — it populates itself once that happens, no action needed.
 
 # 4. NetworkPolicy (only self-care -> subscriber-api) + ServiceMonitor (M11, needs UWM)
 oc apply -n mobily-capstone -f - <<'EOF'
@@ -147,23 +168,27 @@ oc -n mobily-capstone logs -l app=subscriber-api --previous --tail=5   # connect
 oc -n mobily-capstone scale deploy/subscriber-db --replicas=1    # fix; Argo CD stays/returns Healthy
 ```
 
-**Verified renders** *(`oc create --dry-run=client -o yaml`, run offline with oc 4.22 — real):*
+**Live-verified renders** *(`oc create --dry-run=client -o yaml` with oc 4.22 against the OCP
+4.18.45 training cluster; the full stack — Secret, PVC, all three Deployments, Services, Route —
+was also applied for real in a scratch project and torn down afterward):*
 
 ```yaml
 # Secret
 apiVersion: v1
 data:
-  password: PHlvdXItcGFzc3dvcmQ+
-  username: bW9iaWx5
+  POSTGRESQL_PASSWORD: ZGVtb3Bhc3N3b3Jk
+  POSTGRESQL_USER: bW9iaWx5
 kind: Secret
 metadata:
   name: subscriber-db-creds
   namespace: mobily-capstone
 ---
-# Route
+# Route (rendered after the self-care Service already existed — note the inherited label)
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
+  labels:
+    app: self-care
   name: self-care
   namespace: mobily-capstone
 spec:
@@ -177,6 +202,14 @@ spec:
     weight: null
 ```
 
+Applying the full stack for real surfaced one bug the offline render alone couldn't catch: with
+the Secret keyed `username`/`password` (its render is correct — that's a valid Secret), `oc set
+env deploy/subscriber-db --from=secret/subscriber-db-creds` produced env vars `USERNAME`/
+`PASSWORD`, and the postgres container failed to start (`CreateContainerConfigError`, then a log
+demanding `POSTGRESQL_USER`/`POSTGRESQL_PASSWORD`/`POSTGRESQL_DATABASE`). Re-keying the Secret to
+`POSTGRESQL_USER`/`POSTGRESQL_PASSWORD` fixed it — the pod reached `1/1 Running` and the log showed
+PostgreSQL genuinely `accepting connections`. The Task 1/2 solution above reflects the fix.
+
 **Why this is the whole course:** a customer request enters through a **Route** (M6) → **Service**
 (M3) → **Deployment** (M3), which reads a **Secret** (M7) to reach a DB backed by a **PVC/PV** (M7),
 inside an RBAC-scoped **Project** (M8), guarded by a **NetworkPolicy** (M6), watched by **Prometheus**
@@ -189,11 +222,20 @@ the **etcd snapshot** restores the *whole control plane* after quorum loss — a
 
 ---
 
-> **◐ Partially verified:** the capstone **manifests render for real** — the **Secret**, **PVC**,
-> **Route**, and **Deployment** YAML were produced by `oc create --dry-run=client -o yaml` **run live
-> offline with oc 4.22**. Steps needing a **live cluster** (pod readiness, endpoints, Argo CD
-> `Synced/Healthy`, the break/diagnose/fix loop, the etcd snapshot) are **representative of OpenShift
-> 4.18** — stack objects apply as a project user; **Argo CD** install and the **etcd snapshot** are
-> admin. Images `ubi9/httpd-24` (403 on `/` proves connectivity) and
-> `quay.io/sclorg/postgresql-15-c9s` (freely pullable) are the course standards. Validate live when
-> the cluster is up.
+> **● Live-verified — 2026-07-16**, project-user, on the shared **OCP 4.18.45** training cluster.
+> Tasks 1–3 were run for real in a scratch project: Secret, PVC, all three Deployments
+> (`subscriber-db`/`subscriber-api`/`self-care`), Services, and the edge Route were **applied**, not
+> just rendered. This live run **found and fixed a real bug** in the solution: the original
+> `username`/`password` Secret keys don't match what `oc set env --from=secret` produces
+> (`USERNAME`/`PASSWORD` — it uppercases the key name) or what the postgres image requires
+> (`POSTGRESQL_USER`/`POSTGRESQL_PASSWORD` exactly) — the db container never started until the
+> Secret's keys were renamed to match (see inline notes and the "Verified renders" section). Two
+> more real behaviors were confirmed: the PVC stays `Pending` under `WaitForFirstConsumer` until a
+> pod mounts it, and `oc create route` inherits `app:` labels from a pre-existing target Service.
+> The scratch project was deleted after. **Task 4 (NetworkPolicy/ServiceMonitor), Task 5 (Argo CD
+> Application + `Synced/Healthy`), and Task 6 (etcd snapshot + break/diagnose/fix loop)** remain
+> **representative** — GitOps (OpenShift GitOps operator) is installed on this cluster but wiring a
+> real Git-backed Application, and re-running the admin-only etcd snapshot, wasn't repeated here
+> (see Demo 1/Exercise 1 and Demo 2/Exercise 2 for those live-verified separately). Images
+> `ubi9/httpd-24` (403 on `/` proves connectivity) and `quay.io/sclorg/postgresql-15-c9s` (freely
+> pullable) are the course standards.

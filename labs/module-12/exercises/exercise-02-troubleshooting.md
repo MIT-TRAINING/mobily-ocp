@@ -58,8 +58,12 @@ oc set resources deploy/subscriber-db -n mobily-apps --limits=memory=512Mi
 oc get pods -n mobily-apps                           # both Running, subscriber-api 1/1
 
 # 5. platform layer:
-oc get co | awk 'NR==1 || $4=="False"'
+oc get co | awk 'NR==1 || $3=="False"'
 ```
+
+> **Fixed a bug:** the original filter used `$4` (that's the **PROGRESSING** column, not
+> **AVAILABLE**). `oc get co`'s columns are `NAME VERSION AVAILABLE PROGRESSING DEGRADED SINCE
+> MESSAGE` — AVAILABLE is `$3`.
 
 Expected: `subscriber-api` `CrashLoopBackOff` → logs show `connection refused: subscriber-db` →
 `subscriber-db` `OOMKilled` (exit 137) → after raising its memory limit both pods `Running`.
@@ -101,7 +105,7 @@ oc set resources deploy/subscriber-db -n mobily-apps --limits=memory=512Mi
 oc get pods -n mobily-apps                 # subscriber-db Running; subscriber-api 1/1 Ready
 
 # 5. platform layer — same loop, different entry point
-oc get co | awk 'NR==1 || $4=="False"'     # any AVAILABLE=False operator
+oc get co | awk 'NR==1 || $3=="False"'     # any AVAILABLE=False operator (AVAILABLE is column 3)
 oc describe co <name> | sed -n '/Conditions:/,+8p'   # message names the cause -> descend a layer
 #   for a platform problem or a support case: oc adm must-gather --dest-dir=./mg
 ```
@@ -117,9 +121,18 @@ to a support case. Events tell you *where*; logs tell you *why*.
 
 ---
 
-> **◐ Partially verified:** the `oc` command **syntax** follows the OCP 4.18 / oc 4.22 references,
-> and diagnostic help text (`oc debug -h`, `oc adm must-gather -h`) was **confirmed offline with oc
-> 4.22**. The failure output — statuses, events, `OOMKilled` last state, degraded-operator
-> conditions — **requires a live cluster** (app steps as a project user; ClusterOperators/
-> `must-gather` as admin) and was not run at authoring (cluster asleep/unreachable). Output is
-> **representative of OpenShift 4.18**; validate live when the cluster is up.
+> **● Mostly live-verified — 2026-07-16**, on the shared **OCP 4.18.45** training cluster, using a
+> real deliberately-broken `subscriber-api`/`subscriber-db` pair in a scratch `mobily-apps` project
+> (a TCP-probing `subscriber-api` container and a `subscriber-db` given a tight memory limit).
+> Tasks 1–2 are **fully real**: the `subscriber-api` container genuinely crash-loops on a real
+> `connection refused`, with real events/`BackOff` output captured live. **Task 3's `OOMKilled`
+> state is confirmed real** — this exact scenario (image `quay.io/sclorg/postgresql-15-c9s` at a
+> 20Mi memory limit) produced a real `OOMKilled`/exit 137 in this course's companion Demo 2, run on
+> this same cluster the same week. Re-running it for this exercise showed **real run-to-run
+> variance**: at 20Mi and 14Mi the db pod instead sat at `1/1 Ready` while genuinely refusing
+> connections and producing zero log output — a legitimate, separate gotcha (no readiness probe
+> means `Ready` only reflects "container process started," not "app is actually serving"), worth
+> knowing but not the specific failure this exercise targets. If you don't get a clean `OOMKilled`
+> on the first try, lower the memory limit further or retry — it depends on node memory pressure at
+> the time. Task 4's fix and Task 5's `awk` bug (fixed — see inline note) were verified live. The
+> scratch project was deleted after.

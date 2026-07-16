@@ -40,43 +40,61 @@ oc get co etcd
 oc get nodes -l node-role.kubernetes.io/master
 ```
 
-**Expected output** *(requires a cluster + admin — representative of OCP 4.18):*
+**Live output** *(captured 2026-07-15 on the shared OCP 4.18.45 training cluster):*
 
 ```
-NAME   VERSION   AVAILABLE   PROGRESSING   DEGRADED   SINCE
-etcd   4.18.x    True        False         False      21d
+NAME   VERSION   AVAILABLE   PROGRESSING   DEGRADED   SINCE   MESSAGE
+etcd   4.18.45   True        False         False      11d
 
-NAME       STATUS   ROLES                  AGE   VERSION
-master-0   Ready    control-plane,master   34d   v1.31.x
-master-1   Ready    control-plane,master   34d   v1.31.x
-master-2   Ready    control-plane,master   34d   v1.31.x
+NAME                                         STATUS   ROLES                  AGE   VERSION
+ip-10-0-23-236.ap-south-1.compute.internal   Ready    control-plane,master   11d   v1.31.14
+ip-10-0-61-153.ap-south-1.compute.internal   Ready    control-plane,master   11d   v1.31.14
+ip-10-0-93-108.ap-south-1.compute.internal   Ready    control-plane,master   11d   v1.31.14
 ```
 
 > **Narrate:** `AVAILABLE=True, DEGRADED=False` is the green light from the **etcd Operator** —
 > snapshot a healthy quorum, not a degraded one. Three masters = 3-member etcd (Module 11).
+>
+> **Gotcha:** on this AWS IPI cluster, master node names are **not** `master-0/1/2` — they're the
+> EC2-derived hostnames above (`ip-10-0-...`). Don't hardcode a name; capture one:
+> ```bash
+> MASTER=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[0].metadata.name}')
+> ```
 
 ---
 
 ## Step 2 — Open a root shell on a master and take the snapshot
 
 ```bash
-# open a privileged debug pod on a master, then step onto the host filesystem
-oc debug node/<master-0>
+# capture a master node name, then open a privileged debug pod on it
+MASTER=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[0].metadata.name}')
+oc debug node/$MASTER
 # --- inside the debug pod ---
 chroot /host
 # run the backup script; it writes into the directory you name
 sudo /usr/local/bin/cluster-backup.sh /home/core/etcd-backup
 ```
 
-**Expected output** *(requires a cluster + admin — representative):*
+**Live output** *(captured 2026-07-15, real run on the training cluster):*
 
 ```
-Certificate /etc/kubernetes/static-pod-resources/.../etcd-serving.crt is missing. Checking in different directory
-found latest kube-apiserver-pod: ...
-found latest etcd-pod: ...
-{"level":"info","msg":"created temporary db file","path":"/home/core/etcd-backup/snapshot_2026-07-08_020000.db.part"}
-{"level":"info","msg":"fetching snapshot","endpoint":"https://10.0.0.10:2379"}
-{"level":"info","msg":"saved","path":"/home/core/etcd-backup/snapshot_2026-07-08_020000.db"}
+Temporary namespace openshift-debug-bwssw is created for debugging node...
+Starting pod/ip-10-0-23-236ap-south-1computeinternal-debug-wnpt2 ...
+To use host binaries, run `chroot /host`.
+Certificate /etc/kubernetes/static-pod-certs/configmaps/etcd-all-bundles/server-ca-bundle.crt is missing. Checking in different directory
+Certificate /etc/kubernetes/static-pod-resources/etcd-certs/configmaps/etcd-all-bundles/server-ca-bundle.crt found!
+found latest kube-apiserver: /etc/kubernetes/static-pod-resources/kube-apiserver-pod-7
+found latest kube-controller-manager: /etc/kubernetes/static-pod-resources/kube-controller-manager-pod-6
+found latest kube-scheduler: /etc/kubernetes/static-pod-resources/kube-scheduler-pod-6
+found latest etcd: /etc/kubernetes/static-pod-resources/etcd-pod-8
+etcdctl version: 3.5.18
+API version: 3.5
+{"level":"info","ts":"2026-07-15T17:55:32Z","msg":"created temporary db file","path":"/home/core/etcd-backup/snapshot_2026-07-15_175526.db.part"}
+{"level":"info","ts":"2026-07-15T17:55:32Z","msg":"fetching snapshot","endpoint":"https://10.0.23.236:2379"}
+{"level":"info","ts":"2026-07-15T17:55:33Z","msg":"fetched snapshot","endpoint":"https://10.0.23.236:2379","size":"157 MB","took":"1 second ago"}
+Snapshot saved at /home/core/etcd-backup/snapshot_2026-07-15_175526.db
+{"level":"info","ts":"2026-07-15T17:55:33Z","msg":"saved","path":"/home/core/etcd-backup/snapshot_2026-07-15_175526.db"}
+{"hash":544302140,"revision":1134361,"totalKey":13476,"totalSize":157089792}
 snapshot db and kube resources are successfully saved to /home/core/etcd-backup
 ```
 
@@ -94,12 +112,12 @@ snapshot db and kube resources are successfully saved to /home/core/etcd-backup
 ls -lh /home/core/etcd-backup
 ```
 
-**Expected output** *(requires a cluster + admin — representative):*
+**Live output** *(captured 2026-07-15, real run on the training cluster):*
 
 ```
-total 148M
--rw-------. 1 root root 148M Jul  8 02:00 snapshot_2026-07-08_020000.db
--rw-------. 1 root root  74K Jul  8 02:00 static_kuberesources_2026-07-08_020000.tar.gz
+total 150M
+-rw-------. 1 root root 150M Jul 15 17:55 snapshot_2026-07-15_175526.db
+-rw-------. 1 root root  81K Jul 15 17:55 static_kuberesources_2026-07-15_175526.tar.gz
 ```
 
 > **Narrate:** Two artifacts: the **`snapshot_*.db`** (the crown jewels — the entire cluster's
@@ -117,20 +135,22 @@ exit          # exits the debug pod
 
 # copy the backup somewhere it survives losing this node
 # (example: to your workstation via the debug pod, or push to object storage / another host)
-oc debug node/<master-0> -- chroot /host tar czf - /home/core/etcd-backup > mobily-etcd-backup-$(date +%F).tgz
+oc debug node/$MASTER -- chroot /host tar czf - /home/core/etcd-backup > mobily-etcd-backup-$(date +%F).tgz
 ls -lh mobily-etcd-backup-*.tgz
 ```
 
-**Expected output** *(requires a cluster + admin — representative):*
+**Live output** *(captured 2026-07-15, real run on the training cluster):*
 
 ```
-Starting pod/master-0-debug ...
--rw-r--r--  1 you  staff   148M Jul  8 02:03 mobily-etcd-backup-2026-07-08.tgz
+Starting pod/ip-10-0-23-236ap-south-1computeinternal-debug ...
+Removing debug pod ...
+-rw-r--r--  1 you  staff    42M Jul 15 23:36 mobily-etcd-backup-2026-07-15.tgz
 ```
 
-> **Narrate:** This is the step teams skip and regret. A snapshot sitting only on `master-0` is
-> worthless if you lose `master-0`. Ship it off — object storage, another host, wherever your DR
-> plan says. **Now** you have a real backup.
+> **Narrate:** This is the step teams skip and regret. A snapshot sitting only on the master it was
+> taken on is worthless if you lose that node. Ship it off — object storage, another host, wherever
+> your DR plan says. **Now** you have a real backup. (Gzip shrinks the 150 MB snapshot to ~42 MB
+> here — etcd's b-tree pages compress well.)
 
 ---
 
@@ -142,6 +162,12 @@ Starting pod/master-0-debug ...
 # then, cluster-wide: approve pending CSRs and revalidate operators
 oc get csr | grep -i pending          # after a restore you'll typically have some
 # oc adm certificate approve <csr>...
+```
+
+**Live output** *(captured 2026-07-15 — cluster is healthy, so no pending CSRs right now; expect some after an actual restore):*
+
+```
+No resources found
 ```
 
 > **Narrate — the single most important decision in this module:**
@@ -159,7 +185,7 @@ oc get csr | grep -i pending          # after a restore you'll typically have so
 ```bash
 # The demo only created snapshot files + one local tarball. Remove the on-node copy if this was
 # a drill (keep real backups!):
-oc debug node/<master-0> -- chroot /host rm -rf /home/core/etcd-backup   # drill cleanup only
+oc debug node/$MASTER -- chroot /host rm -rf /home/core/etcd-backup      # drill cleanup only
 rm -f mobily-etcd-backup-*.tgz                                            # local drill tarball
 oc whoami                                                                 # back in your own shell
 ```
@@ -177,10 +203,14 @@ oc whoami                                                                 # back
 
 ---
 
-> **◐ Partially verified:** `oc`/`cluster-backup.sh`/`oc debug node` **syntax** follows the OCP
-> 4.18 / oc 4.22 references, but every step **requires a live OpenShift cluster with
-> cluster-admin** and a control-plane host shell, and was not run at authoring (cluster
-> asleep/unreachable). Output — operator table, backup-script log, file listing, sizes — is
-> **representative of OpenShift 4.18 / etcd 3.5**; real values vary per cluster. Validate live as
-> admin when the cluster is up. **Restore (`cluster-restore.sh`) is break-glass — practise it in a
-> throwaway cluster, never first in production.**
+> **● Fully live-verified — 2026-07-15**, cluster-admin, on the shared **OCP 4.18.45** training
+> cluster (3 masters, real AWS IPI hostnames). Every command through Step 4 was **run for real**:
+> `oc get co etcd` / `oc get nodes -l node-role.kubernetes.io/master`, a live `oc debug node` +
+> `cluster-backup.sh` snapshot (real 150 MB `.db` + 81K `static_kuberesources` tarball, real
+> `etcdctl 3.5.18` log lines), the file listing, and the off-cluster `tar czf` copy (real 42 MB
+> `.tgz`). All on-node/local artifacts from the drill were cleaned up. **Step 5 (`cluster-restore.sh`)
+> was intentionally NOT run** — it's break-glass, rewinds the whole cluster, and must never be
+> practised for the first time in production or on a shared training cluster; that step's commands
+> are shown for narration only. Fixed a stale placeholder: master node names on this cluster are
+> **not** `master-0/1/2` (real names are AWS-derived, e.g. `ip-10-0-23-236...`) — the steps now
+> capture the name into `$MASTER` instead of hardcoding it.

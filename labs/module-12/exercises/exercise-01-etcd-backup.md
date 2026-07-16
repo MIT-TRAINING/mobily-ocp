@@ -32,6 +32,11 @@
 
 > **Hint (Task 1):** `oc get co etcd` and `oc get nodes -l node-role.kubernetes.io/master`.
 
+> **Hint (Task 2):** don't hardcode a master name — on a real (e.g. AWS IPI) cluster, master
+> hostnames aren't `master-0/1/2`. Capture one first:
+> `MASTER=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[0].metadata.name}')`,
+> then `oc debug node/$MASTER`.
+
 > **Hint (Task 5):** quorum of 3 = 2. Holds with 1 down (replace); lost with 2 down (restore =
 > whole-cluster rewind to the snapshot).
 
@@ -74,8 +79,9 @@ Expected: `etcd` operator healthy; the backup dir contains **`snapshot_<ts>.db`*
 oc get co etcd                                    # AVAILABLE=True, DEGRADED=False
 oc get nodes -l node-role.kubernetes.io/master    # 3x Ready
 
-# 2. Take the snapshot from a master's host shell
-oc debug node/<master-0>
+# 2. Take the snapshot from a master's host shell — capture the name, don't hardcode it
+MASTER=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[0].metadata.name}')
+oc debug node/$MASTER
 chroot /host
 sudo /usr/local/bin/cluster-backup.sh /home/core/etcd-backup
 
@@ -87,7 +93,7 @@ exit    # chroot
 exit    # debug pod
 
 # 4. Copy it OFF the cluster
-oc debug node/<master-0> -- chroot /host tar czf - /home/core/etcd-backup \
+oc debug node/$MASTER -- chroot /host tar czf - /home/core/etcd-backup \
   > mobily-etcd-backup-$(date +%F).tgz
 ls -lh mobily-etcd-backup-*.tgz
 
@@ -95,6 +101,26 @@ ls -lh mobily-etcd-backup-*.tgz
 #    (a) 1 master lost  -> quorum 2/3 HOLDS -> REPLACE the etcd member (no rewind, no data loss)
 #    (b) 2 masters lost -> quorum LOST      -> RESTORE on one master from this snapshot
 #        (rewinds the WHOLE cluster to the snapshot; then approve CSRs, revalidate operators)
+```
+
+**Live output** *(captured 2026-07-16, real run on the OCP 4.18.45 training cluster):*
+
+```
+NAME   VERSION   AVAILABLE   PROGRESSING   DEGRADED   SINCE   MESSAGE
+etcd   4.18.45   True        False         False      11d
+
+NAME                                         STATUS   ROLES                  AGE   VERSION
+ip-10-0-23-236.ap-south-1.compute.internal   Ready    control-plane,master   11d   v1.31.14
+ip-10-0-61-153.ap-south-1.compute.internal   Ready    control-plane,master   11d   v1.31.14
+ip-10-0-93-108.ap-south-1.compute.internal   Ready    control-plane,master   11d   v1.31.14
+
+# ls -lh /home/core/etcd-backup
+total 174M
+-rw-------. 1 root root 174M Jul 16 02:23 snapshot_2026-07-16_022314.db
+-rw-------. 1 root root  81K Jul 16 02:23 static_kuberesources_2026-07-16_022314.tar.gz
+
+# off-cluster copy
+-rw-r--r--  1 saravana  wheel    48M Jul 16 07:53 mobily-etcd-backup-2026-07-16.tgz
 ```
 
 **Why:** etcd is the cluster's only source of truth, so the snapshot is the difference between a
@@ -108,9 +134,12 @@ data bytes — that needs PV snapshots / OADP.
 
 ---
 
-> **◐ Partially verified:** `oc`/`cluster-backup.sh`/`oc debug node` **syntax** follows the OCP
-> 4.18 / oc 4.22 references; every step **requires a live cluster with cluster-admin** and a
-> control-plane host shell, and was not run at authoring (cluster asleep/unreachable). Output
-> (operator table, backup-script log, file listing) is **representative of OpenShift 4.18 / etcd
-> 3.5**; real values vary. Validate live as admin when the cluster is up. **Never run
-> `cluster-restore.sh` on a shared cluster — describe the path only.**
+> **● Live-verified — 2026-07-16**, cluster-admin, on the shared **OCP 4.18.45** training cluster
+> (3 masters, real AWS IPI hostnames). Tasks 1–4 and their solution commands were **run for real**:
+> a live `cluster-backup.sh` snapshot (real 174 MB `.db` + 81K `static_kuberesources` tarball), the
+> file listing, and the off-cluster `tar czf` copy (real 48 MB `.tgz`). The drill snapshot and
+> local tarball were cleaned up afterward. Fixed a stale placeholder: master node names on this
+> cluster are **not** `master-0/1/2` (real names are AWS-derived, e.g. `ip-10-0-23-236...`) — the
+> solution now captures the name into `$MASTER` instead of hardcoding it. **`cluster-restore.sh`
+> was intentionally not run** — it's break-glass and must never be practised for the first time on
+> a shared cluster; Task 5 stays a paper exercise.

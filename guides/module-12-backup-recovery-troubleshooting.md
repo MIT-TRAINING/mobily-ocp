@@ -154,11 +154,13 @@ writes them to a directory you choose. You run it from *inside* a master, typica
 `oc debug node/<master>`.
 
 ```bash
-# 1. pick a healthy master
+# 1. pick a healthy master (capture its real name — cluster hostnames on a
+#    real install aren't "master-0/1/2", e.g. AWS IPI uses ip-10-0-...)
 oc get nodes -l node-role.kubernetes.io/master
+MASTER=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[0].metadata.name}')
 
 # 2. open a root debug shell on it, then chroot to the host filesystem
-oc debug node/<master-0>
+oc debug node/$MASTER
 chroot /host
 
 # 3. run the backup script (writes snapshot + resources to the target dir)
@@ -310,6 +312,13 @@ oc delete node <worker>
   ```
 - **UPI / bare metal:** you provision the replacement host yourself; it boots, joins, and you
   **approve its CSRs** (`oc get csr` → `oc adm certificate approve`) before it goes `Ready`.
+
+> **Machine name ≠ Node name (verified live on this course's IPI cluster).** `oc -n
+> openshift-machine-api get machines` shows friendly names like `<cluster>-master-0` /
+> `<cluster>-worker-ap-south-1a-nzpd9` — but `oc get nodes` shows the cloud-provider hostname
+> (e.g. `ip-10-0-23-236.ap-south-1.compute.internal`) for that same host. Don't assume they match:
+> `oc debug node/<name>` needs the **Node** name; `oc delete machine <name>` needs the **Machine**
+> name.
 
 > **DaemonSet pods don't drain** (they're one-per-node by design) — hence
 > `--ignore-daemonsets`. And `--delete-emptydir-data` acknowledges you'll lose any `emptyDir`

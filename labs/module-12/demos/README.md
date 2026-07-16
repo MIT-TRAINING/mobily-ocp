@@ -28,8 +28,11 @@ integrating networking, storage, security, monitoring, and GitOps.
   project, and an Argo CD Application) is a **project-user** action once the platform is healthy.
 - **Manifest rendering with `oc create --dry-run=client -o yaml` needs no cluster** — several
   capstone objects below are shown as **real offline renders** (verified with oc 4.22).
-- **Secrets are placeholders** (`<master-0>`, `<cluster-domain>`, `$OCP_PASSWORD`,
-  `<your-password>`) — never commit real tokens, kubeconfig, or passwords.
+- **Master node names are captured, not hardcoded** — `$MASTER=$(oc get nodes -l
+  node-role.kubernetes.io/master -o jsonpath='{.items[0].metadata.name}')`, since real cluster
+  node names are AWS-derived hostnames, not `master-0/1/2`.
+- **Secrets are placeholders** (`<cluster-domain>`, `$OCP_PASSWORD`, `<your-password>`) — never
+  commit real tokens, kubeconfig, or passwords.
 - **Cleanup** is included at the end of every demo (the backup demo is read-only apart from the
   snapshot files it writes).
 
@@ -52,9 +55,18 @@ Companion material: the interactive [visualizations](../index.html), the hands-o
 
 ---
 
-> **◐ Partially verified (see each demo's footer).** Manifest-rendering steps
-> (`oc create --dry-run=client -o yaml` for the capstone's **PVC / Secret / Route / Deployment**)
-> were **run live offline with oc 4.22** — real output. Steps needing a **live cluster**
-> (`cluster-backup.sh` output, broken-pod events, node drain, Argo CD sync) are **representative
-> of OpenShift 4.18** and should be validated when the cluster is up (backup/restore, node ops,
-> etcd, and `must-gather` as admin; the capstone objects as a project user).
+> **● Live-verified — 2026-07-15 (see each demo's footer).** All three demos were re-run against the
+> shared **OCP 4.18.45** training cluster while it was up: Demo 1's `cluster-backup.sh` snapshot,
+> off-cluster copy, and cleanup all ran for real on a live master; Demo 2's crash-loop/OOMKilled
+> chain was reproduced with a real broken `subscriber-db`/`subscriber-api` pair and fixed for real,
+> and `must-gather` was run for real (surfacing a genuine stall on the performance-profile
+> collector — documented in Demo 2); Demo 3's Secret/PVC/Deployment/Route manifests were rendered
+> **and applied** in a real scratch project (surfacing two real behaviors — PVC
+> `WaitForFirstConsumer` binding and Route label inheritance — documented in Demo 3). Two real bugs
+> were fixed in the process: Demo 2's `oc get co` `awk` filter was matching the wrong column, and
+> master-node placeholders (`<master-0>`) were replaced with a captured `$MASTER` variable since
+> this cluster's real node names are AWS-derived hostnames, not `master-0/1/2`. Demo 1's
+> **restore** (`cluster-restore.sh`) and Demo 2's **degraded-ClusterOperator** example remain
+> narrated/representative — not run — because both require deliberately breaking a shared
+> training cluster, which isn't safe to demo live. All scratch namespaces created for validation
+> (`mobily-apps`, `mobily-capstone`) were deleted afterward.
