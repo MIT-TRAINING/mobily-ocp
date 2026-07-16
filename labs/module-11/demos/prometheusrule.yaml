@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: subscriber-api-alerts
+  namespace: mobily-monitoring
+spec:
+  groups:
+    - name: subscriber-api.rules
+      rules:
+        - alert: SubscriberAPIHighErrorRate
+          expr: sum(rate(http_requests_total{job="subscriber-api",code=~"5.."}[5m])) / sum(rate(http_requests_total{job="subscriber-api"}[5m])) > 0.05
+          for: 10m
+          labels: { severity: warning }
+          annotations: { summary: "subscriber-api 5xx error rate above 5% for 10m" }
